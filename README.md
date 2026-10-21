@@ -6,15 +6,14 @@ Nothing in the MCP protocol inspects tool metadata. The server serves the payloa
 
 ## Status
 
-Steps HM0 (server, victim, pinned client, API) and HM1 (web). Built and tested:
+Built and tested:
 
 - The hostile server, ported from the AI-DEMO2 `standalone/hostile-mcp-server`: Streamable HTTP and SSE, `/health`, 11 tools (6 with poisoned metadata, the rug-pull tool, a result-injection tool, 3 inert action stubs), one poisoned resource, one poisoned prompt. The wire output is checked byte for byte against the source.
-- The offline, deterministic victim (`server/src/victim.js`).
-- The pinned client library (`server/src/pinning.js`).
-- The API, including `GET /api/health` (`demo-health/1`).
+- The offline, deterministic victim, the pinned client library, and the API, including `GET /api/health` (`demo-health/1`) and `GET /api/safety-scan`.
 - The web UI: gallery (badges: pinning, scanner, neither), run the victim (ungoverned and pinned side by side), the three-step rug-pull flow, the honest limits page, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), stories S05 and S14 with the Allowed/Blocked switch and generic, airlines and banking packs, a presenter toggle, light and dark themes. Untrusted strings render as inert text only; a banner on every page says the server is hostile on purpose.
+- Docker on OrbStack, a shelf registry entry, a Learning Hub content pack, and a browser e2e script (all below).
 
-Not built yet: Docker, the shelf registration. The optional real-model agent (`npm run agent -w server`) is copied from the source and tested offline only; it has not been run against a live model from this repo.
+Not verified: the optional real-model agent (`npm run agent -w server`) is copied from the source and tested offline only; it has not been run against a live model from this repo. The mcp-inspector was not run (see [docs/clients.md](docs/clients.md)). The Docker image has been run on OrbStack only. The shelf registration was checked against a temporary shelf instance, not your own.
 
 ## Safety rules
 
@@ -38,7 +37,72 @@ npm start           # http://127.0.0.1:4701/ (PORT to change)
 npm run dev         # API on 4701, Vite on 4702
 ```
 
+`npm start` serves the built UI from `web/dist`, so run `npm run build` first.
+
 Ports start at 4700 so they stay clear of the other demos.
+
+## Docker
+
+```bash
+docker compose up --build -d      # http://127.0.0.1:4701 ; HOST_PORT=4731 to change the published port
+docker compose down
+```
+
+Node 22, non-root, `NODE_ENV=production`. The server binds `0.0.0.0` inside the container (the image sets `HOSTILE_BIND`, the explicit opt-in) but compose publishes the port as `127.0.0.1:PORT:4701`, so nothing off the machine can reach it. Do not widen that. The container has a health check on `/api/health`. See [docs/safety.md](docs/safety.md).
+
+## Demo shelf
+
+[docs/shelf-entry.json](docs/shelf-entry.json) is a registry entry for the SE shelf (`demo-shelf`), catalog id D6. Do not edit the shelf repo: copy the entry into the shelf's git-ignored `.data/demos.local.json` (or merge its `demos` array into an existing file) and set `composeFile` to this checkout's absolute path.
+
+```json
+{
+  "demos": [
+    {
+      "id": "hostile-mcp",
+      "name": "Hostile MCP / rug-pull",
+      "catalogId": "D6",
+      "kind": "Demo",
+      "description": "A deliberately hostile MCP server, an offline victim, and a pinned client shown side by side with an ungoverned one: the tool that changed overnight.",
+      "url": "http://localhost:4701",
+      "healthPath": "/api/health",
+      "composeFile": "/absolute/path/to/hostile-mcp/docker-compose.yml",
+      "composeOverlays": []
+    }
+  ]
+}
+```
+
+With the app running on 4701 the shelf shows it as Ready. Checked against a shelf instance started from `demo-shelf` on a free port with a temporary data directory.
+
+## Learning Hub content pack
+
+`content-pack.json` (format `demo-content-pack/1`, schema copied to `docs/content-pack.schema.json` from the ID-JAG kit) holds the glossary (tool poisoning, tool shadowing, rug pull, trust on first use, inputSchema exfil sink, result-based injection, credential harvest, pinning), cards for the pages and the S05 and S14 stories. `sources` is empty on purpose: the only URLs in the source README are local, so none could be verified as public documentation.
+
+```bash
+npm run content-pack      # regenerate (content/terms.json + the pages + the stories) and validate with ajv
+node scripts/validate-content-pack.mjs [file]
+```
+
+`npm test` fails if the committed pack is stale or does not validate.
+
+## Browser e2e
+
+```bash
+npm run build
+npm run e2e                      # starts the server on E2E_PORT (default 4743), drives it, stops it
+npm run e2e -- http://127.0.0.1:4701   # drive a server that is already running
+```
+
+Drives the gallery, the side-by-side run (including the day-one limit: the poison lands even with pinning), the three-step rug-pull flow with its reset, the limits page and the diagram in a real Chromium, and fails if the browser requests anything outside the app origin. Screenshots go to `.data/e2e-screenshots` (git-ignored). It is not run by CI. It needs a Chromium for Playwright (`npx playwright install chromium`); to use one you already have, set `E2E_CHROMIUM` to its executable.
+
+## Docs
+
+- [docs/architecture.md](docs/architecture.md): pieces, canonicalisation, verdicts, the two list counters.
+- [docs/safety.md](docs/safety.md): every safety rule and the test that enforces it.
+- [docs/limits.md](docs/limits.md): what pinning catches and does not.
+- [docs/threat-catalog.md](docs/threat-catalog.md): generated from the catalog data.
+- [docs/clients.md](docs/clients.md): pointing a real MCP client or the inspector at it; how the Privilege demo defends the call path while pinning defends the metadata path.
+- [CHANGELOG.md](CHANGELOG.md).
 
 ## The victim
 
@@ -77,6 +141,7 @@ Does not catch: a poison already present when the tool was first approved (the a
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/health` | `demo-health/1`. Public, GET only, state from the doctor checks cached 60 s. |
+| `GET /api/safety-scan` | Runs the payload host scan now: `{ok, scanned, offenders}`. `ok` is true when every host in every payload is reserved. |
 | `GET /api/catalog` | Each poison: what it does, how it lands, and whether a scanner and pinning catch it. |
 | `GET /api/victim-rules` | The victim rules and the pinning catch/limit lists. |
 | `POST /api/run-victim` | `{task, mode: 'ungoverned'\|'pinned', stage?: 'first'\|'later'}`. `later` (default) is the morning after, list #2. |
@@ -98,7 +163,11 @@ server/src/victim.js      the offline victim
 server/src/session.js     in-memory MCP sessions
 server/src/scenario.js    the S05 run behind /api/run-victim
 server/tools/agent.mjs    optional real-model victim (needs LLM_URL)
-web/                      React + Vite skeleton
+web/                      React + Vite UI
+content/terms.json        glossary source for the content pack
+scripts/                  doctor, content pack, threat catalog, e2e
+docs/                     architecture, safety, limits, catalog, clients, shelf entry
+Dockerfile, docker-compose.yml
 ```
 
 ## Licence

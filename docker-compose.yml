@@ -1,0 +1,21 @@
+# OrbStack:  HOST_PORT=4701 docker compose up --build -d   ->  http://127.0.0.1:4701
+# The server binds 0.0.0.0 INSIDE the container (HOSTILE_BIND is the opt-in), but the port is published on loopback only.
+# Do not change the 127.0.0.1 below: this server serves hostile payloads.
+name: hostile-mcp
+
+services:
+  hostile-mcp:
+    build: .
+    ports:
+      - "127.0.0.1:${HOST_PORT:-4701}:4701"
+    environment:
+      PORT: "4701"
+      HOSTILE_BIND: 0.0.0.0
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4701/api/health').then(r=>r.json()).then(j=>process.exit(j.state==='ready'?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

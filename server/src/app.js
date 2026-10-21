@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createMcpRouter, TOOLS } from './mcp/hostile.js';
-import { assertBindAllowed, bindHost } from './safety.js';
+import { assertBindAllowed, bindHost, payloadCorpus, scanPayloads } from './safety.js';
 import { catalog } from './catalog.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
@@ -29,6 +29,11 @@ export function createApp({ health = createHealth(), sessions = createSessions()
   api.use(express.json({ limit: '8kb' }));
   api.use('/health', health.router);
   api.get('/catalog', (_req, res) => res.json(catalog()));
+  // The payload host scan, run on demand: every payload the server can put on the wire, checked for any non-reserved host.
+  api.get('/safety-scan', (_req, res) => {
+    const offenders = scanPayloads();
+    res.json({ ok: offenders.length === 0, scanned: payloadCorpus().length, offenders });
+  });
   api.get('/victim-rules', (_req, res) => res.json({ rules: VICTIM_RULES, pinningCatches: CATCHES, pinningLimits: LIMITS }));
 
   api.post('/run-victim', wrap(async (req, res) => {

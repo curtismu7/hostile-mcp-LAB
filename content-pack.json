@@ -1,0 +1,177 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "hostile-mcp",
+  "title": "Hostile MCP / rug-pull",
+  "version": "0.1.0",
+  "demo": {
+    "id": "hostile-mcp",
+    "name": "Hostile MCP",
+    "catalog": "D6",
+    "baseUrl": "http://localhost:4701",
+    "doctor": "/api/health",
+    "tags": [
+      "mcp",
+      "tool-poisoning",
+      "rug-pull",
+      "pinning"
+    ]
+  },
+  "glossary": [
+    {
+      "id": "credential-harvest",
+      "term": "Credential harvest",
+      "definition": "A tool whose input schema asks for a password or one-time code as ordinary parameters, so the agent collects the secret from the user and hands it to the server."
+    },
+    {
+      "id": "input-schema-exfil-sink",
+      "term": "inputSchema exfil sink",
+      "definition": "A tool parameter whose default points off-box (a callback URL or a bcc address). An agent that fills arguments from the schema leaks data on every call without anyone choosing to.",
+      "aliases": [
+        "exfiltration sink",
+        "off-origin sink"
+      ]
+    },
+    {
+      "id": "pinning",
+      "term": "Pinning",
+      "definition": "Recording a hash of each tool's name, description and input schema at approval, and refusing or flagging any tool whose hash later differs. It detects change; it does not judge content.",
+      "aliases": [
+        "tool pinning",
+        "schema pinning"
+      ]
+    },
+    {
+      "id": "result-based-injection",
+      "term": "Result-based injection",
+      "definition": "Instructions hidden in the text a tool call returns. The tool metadata is clean, so neither a metadata scanner nor pinning sees it; it reaches the model only when the result is read."
+    },
+    {
+      "id": "rug-pull",
+      "term": "Rug pull",
+      "definition": "A tool server that serves a clean tool list while it is being reviewed and a poisoned one later, under the same tool name. Nothing in MCP tells the client the metadata changed.",
+      "aliases": [
+        "rug-pull",
+        "tool swap"
+      ]
+    },
+    {
+      "id": "tool-poisoning",
+      "term": "Tool poisoning",
+      "definition": "Putting instructions in a tool's description or schema. The model reads that text as trusted context and the user normally never sees it.",
+      "aliases": [
+        "tool description injection"
+      ]
+    },
+    {
+      "id": "tool-shadowing",
+      "term": "Tool shadowing",
+      "definition": "A second server defines a tool with the same name as a trusted one and claims to be the authoritative version, so a client that resolves tools by name may pick the hostile definition.",
+      "aliases": [
+        "name shadowing"
+      ]
+    },
+    {
+      "id": "trust-on-first-use",
+      "term": "Trust on first use",
+      "definition": "Accepting whatever is presented the first time and only noticing later changes. It is safe only if the first presentation was vetted by a scanner or a person.",
+      "aliases": [
+        "TOFU"
+      ]
+    }
+  ],
+  "sources": [],
+  "cards": [
+    {
+      "id": "diagram",
+      "label": "Diagram",
+      "description": "Server, client, pin check, victim and planned call. Movable boxes, Simulate, Reset.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#/diagram"
+      }
+    },
+    {
+      "id": "gallery",
+      "label": "Poison gallery",
+      "description": "Every payload the server can serve, with what a scanner and pinning each catch.",
+      "group": "try-it",
+      "terms": [
+        "tool-poisoning",
+        "tool-shadowing",
+        "input-schema-exfil-sink",
+        "credential-harvest",
+        "result-based-injection"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#/gallery"
+      }
+    },
+    {
+      "id": "limits",
+      "label": "Honest limits",
+      "description": "What pinning does not catch: a first-list poison it approved blindly, result injection, resources and prompts.",
+      "group": "concept",
+      "terms": [
+        "trust-on-first-use",
+        "result-based-injection"
+      ],
+      "story": "S14",
+      "action": {
+        "type": "route",
+        "href": "/#/limits"
+      }
+    },
+    {
+      "id": "rugpull",
+      "label": "Rug-pull flow",
+      "description": "Approve list 1, come back later, compare: the tool that changed overnight.",
+      "group": "try-it",
+      "terms": [
+        "rug-pull",
+        "trust-on-first-use",
+        "pinning"
+      ],
+      "story": "S05",
+      "action": {
+        "type": "route",
+        "href": "/#/rugpull"
+      }
+    },
+    {
+      "id": "run",
+      "label": "Run the victim",
+      "description": "The same task through an ungoverned client and a pinned client, side by side. No model needed.",
+      "group": "try-it",
+      "terms": [
+        "pinning"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#/run"
+      }
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "metadata-path",
+      "label": "Where the tool metadata is consumed",
+      "href": "/#/diagram"
+    }
+  ],
+  "stories": [
+    {
+      "id": "S05",
+      "title": "A tool changed overnight",
+      "say": "Nothing in MCP checks the tool list twice. A defence has to sit where the metadata is read.",
+      "file": "web/src/data/stories/S05-tool-changed-overnight.json"
+    },
+    {
+      "id": "S14",
+      "title": "The description told the agent to move money",
+      "say": "A description can tell the agent to move money. Vet it before you approve it, and limit what the tool can do.",
+      "file": "web/src/data/stories/S14-description-told-agent-to-move-money.json"
+    }
+  ]
+}

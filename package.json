@@ -15,9 +15,15 @@
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
     "start": "npm start -w server",
-    "test": "npm test -w server && npm test -w web",
+    "test": "npm test -w server && npm test -w web && node --test scripts/content-pack.test.mjs scripts/docs.test.mjs",
     "build": "npm run build -w web",
     "doctor": "node scripts/doctor.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "e2e": "node scripts/e2e.mjs",
+    "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "playwright": "^1.64.1"
   }
 }

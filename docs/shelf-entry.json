@@ -1,0 +1,16 @@
+{
+  "demos": [
+    {
+      "id": "hostile-mcp",
+      "name": "Hostile MCP / rug-pull",
+      "catalogId": "D6",
+      "kind": "Demo",
+      "description": "A deliberately hostile MCP server, an offline victim, and a pinned client shown side by side with an ungoverned one: the tool that changed overnight.",
+      "url": "http://localhost:4701",
+      "healthPath": "/api/health",
+      "composeFile": "/Users/cmuir/Development/hostile-mcp/docker-compose.yml",
+      "composeOverlays": [],
+      "notes": "Host-run: npm start (port 4701). Or: docker compose up --build -d (publishes 127.0.0.1:4701 only). Edit composeFile to this checkout's absolute path."
+    }
+  ]
+}

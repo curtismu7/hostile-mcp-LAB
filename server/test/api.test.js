@@ -30,6 +30,13 @@ test('GET /api/catalog lists the ten poisons with an honest scanner and pinning 
   assert.ok(body.pinningLimits.some((l) => l.id === 'first-list-poison'));
 }));
 
+test('GET /api/safety-scan reports every payload clean of non-reserved hosts', () => withServer(async ({ get }) => {
+  const body = await (await get('/api/safety-scan')).json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.offenders, []);
+  assert.ok(body.scanned > 20);
+}));
+
 test('GET /api/victim-rules documents the rules and the limits', () => withServer(async ({ get }) => {
   const body = await (await get('/api/victim-rules')).json();
   assert.equal(body.rules.length, 7);
