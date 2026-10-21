@@ -18,24 +18,27 @@ export function segments(text) {
   return out;
 }
 
-/** Inert text with suspicious spans highlighted. Highlight carries a title and the text itself, not colour alone. */
-export function Untrusted({ text, block = false }) {
+const CHIP = /(\[U\+[0-9A-F]{4,6}\])/;
+const chips = (text) => String(text).split(CHIP).map((p, i) => (i % 2 ? <span key={i} className="chip" title="Invisible or look-alike character">{p}</span> : <React.Fragment key={i}>{p}</React.Fragment>));
+
+/** Inert text with suspicious spans highlighted. Highlight carries a title and the text itself, not colour alone.
+ *  `revealed` (the server's copy with invisible characters as [U+XXXX]) is shown in place of `text` when given. */
+export function Untrusted({ text, revealed, block = false }) {
+  const show = revealed === undefined ? (t) => t : chips; // chips only for the server's revealed copy
   const Tag = block ? "pre" : "span";
   return (
     <Tag className={`untrusted${block ? " untrusted--block" : ""}`} data-testid="untrusted">
-      {segments(text).map((p, i) => (p.hot ? <mark key={i} title="Flagged: instruction or off-box address">{p.text}</mark> : <React.Fragment key={i}>{p.text}</React.Fragment>))}
+      {segments(revealed ?? text).map((p, i) => (p.hot ? <mark key={i} title="Flagged: instruction or off-box address">{show(p.text)}</mark> : <React.Fragment key={i}>{show(p.text)}</React.Fragment>))}
     </Tag>
   );
 }
-
-const CHIP = /(\[U\+[0-9A-F]{4,6}\])/;
 
 /** Text from the server's revealed copy: each [U+XXXX] chip is a visible, styled text node, everything else is inert text. */
 export function Revealed({ text, block = false }) {
   const Tag = block ? "pre" : "span";
   return (
     <Tag className={`untrusted${block ? " untrusted--block" : ""}`} data-testid="revealed">
-      {String(text ?? "").split(CHIP).map((p, i) => (i % 2 ? <span key={i} className="chip" title="Invisible or look-alike character">{p}</span> : <React.Fragment key={i}>{p}</React.Fragment>))}
+      {chips(text ?? "")}
     </Tag>
   );
 }

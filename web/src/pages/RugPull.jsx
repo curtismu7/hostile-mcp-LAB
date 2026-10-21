@@ -67,7 +67,7 @@ export default function RugPull({ present }) {
           {first && (
             <div data-testid="step1">
               <h4>List #{first.listNumber}: <code>{TOOL}</code></h4>
-              <Untrusted text={find(first.tools, TOOL)?.description} block />
+              <Untrusted text={find(first.tools, TOOL)?.description} revealed={first.descriptionsRevealed?.[TOOL]} block />
               <p className="small">Pinned {approval.approved.length} tools. <code>{TOOL}</code> sha256 <code>{pin?.sha256}</code></p>
               {approval.skipped.length > 0 && <p className="muted small">Refused at approval: {approval.skipped.map((s) => `${s.name} (${s.reason})`).join(", ")}. {approval.note}</p>}
             </div>
@@ -80,7 +80,7 @@ export default function RugPull({ present }) {
           {second && (
             <div data-testid="step2">
               <h4>List #{second.listNumber}: <code>{TOOL}</code></h4>
-              <Untrusted text={find(second.tools, TOOL)?.description} block />
+              <Untrusted text={find(second.tools, TOOL)?.description} revealed={second.descriptionsRevealed?.[TOOL]} block />
             </div>
           )}
         </li>
