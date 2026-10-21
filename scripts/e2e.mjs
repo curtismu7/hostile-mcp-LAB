@@ -90,6 +90,26 @@ try {
   await shot('3c-rugpull-compare');
   await page.getByRole('button', { name: 'Reset the flow' }).click();
   await page.getByRole('button', { name: /Approve list #1/ }).and(page.locator(':enabled')).waitFor({ timeout: 5000 }).catch(() => {});
+
+  // Invisible characters in the plain description views (steps 1 and 2). The hostile server's own text is fixed, so the
+  // list response is rewritten in the browser to carry a U+200B and the matching revealed copy: this checks the page
+  // renders the chip as text in real Chromium, not the server's reveal() (the server tests cover that).
+  await page.route('**/api/mcp-session/*/list', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    for (const t of body.tools) if (t.name === 'get_stock_price') { body.descriptionsRevealed[t.name] = t.description.replace(/^(\S+)/, '$1[U+200B]'); t.description = t.description.replace(/^(\S+)/, '$1\u200B'); }
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.getByRole('button', { name: /Approve list #1/ }).click();
+  await page.getByTestId('step1').waitFor();
+  check((await page.getByTestId('step1').locator('.chip').first().innerText()) === '[U+200B]', 'step 1 description shows the invisible character as a [U+200B] chip');
+  await page.getByRole('button', { name: 'Fetch list #2' }).click();
+  await page.getByTestId('step2').waitFor();
+  check((await page.getByTestId('step2').locator('.chip').first().innerText()) === '[U+200B]', 'step 2 description shows the invisible character as a [U+200B] chip');
+  await shot('3d-rugpull-description-chips');
+  await page.unroute('**/api/mcp-session/*/list');
+  await page.getByRole('button', { name: 'Reset the flow' }).click();
+  await page.getByRole('button', { name: /Approve list #1/ }).and(page.locator(':enabled')).waitFor({ timeout: 5000 }).catch(() => {});
   check(await page.getByRole('button', { name: /Approve list #1/ }).isEnabled(), 'reset returns the flow to step 1');
 
   // Limits and diagram

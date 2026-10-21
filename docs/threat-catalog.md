@@ -120,6 +120,7 @@ Subject: prompt `account_review`. Hides in: prompt.
 - An off-origin sink already present at approval is recorded, not blocked.
 - Only tool metadata is hashed. Instructions inside a tool call result are never seen.
 - Resources and prompts are not tools and are not pinned.
+- The sink scan reads at most 100 levels and 20000 nodes of a schema. A tool that exceeds either is flagged scanTruncated and whatever lies beyond the budget was not examined (it is still hashed in full, so any change is still caught).
 - If a person approves a changed tool again, the new definition becomes the pin.
 - Sink detection reads only schema values (default, const, enum, examples and URLs inside pattern). A URL or email written in a free-text description, a title, or inside a non-string default (an object or array) is not found as a sink.
 - A hostile instruction or a sink on the approved origin's own host is not flagged as a sink.

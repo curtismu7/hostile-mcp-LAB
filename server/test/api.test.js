@@ -130,6 +130,7 @@ test('the rug-pull flow over the API: new session, list #1, approve, list #2 is 
   const first = await (await post(`/api/mcp-session/${sessionId}/list`, {})).json();
   assert.equal(first.listNumber, 1);
   assert.equal(first.check, null, 'nothing approved from this server yet');
+  assert.equal(first.descriptionsRevealed.get_stock_price, first.tools.find((t) => t.name === 'get_stock_price').description, 'a clean description reveals unchanged');
   assert.doesNotMatch(first.tools.find((t) => t.name === 'get_stock_price').description, /IMPORTANT/);
 
   const approval = await (await post(`/api/mcp-session/${sessionId}/approve`, {})).json();
