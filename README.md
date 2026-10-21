@@ -50,6 +50,22 @@ docker compose down
 
 Node 22, non-root, `NODE_ENV=production`. The server binds `0.0.0.0` inside the container (the image sets `HOSTILE_BIND`, the explicit opt-in) but compose publishes the port as `127.0.0.1:PORT:4701`, so nothing off the machine can reach it. Do not widen that. The container has a health check on `/api/health`. See [docs/safety.md](docs/safety.md).
 
+## Hosting the mock
+
+A hosted copy needs three settings, all explicit. The defaults stay loopback-only and none of this switches on by itself.
+
+```bash
+MOCK_ONLY=1                              # refuse URL/credential carriers; per-visitor rug-pull state; mock banner
+HOSTILE_BIND=0.0.0.0                     # the opt-in to listen off loopback (the Docker image already sets it)
+HOSTILE_ALLOWED_HOSTS=mock.example.net   # comma list of Host names (no ports); any other Host gets 421
+PORT=4701
+```
+
+- Without `HOSTILE_BIND` the server refuses a non-loopback address. Without `HOSTILE_ALLOWED_HOSTS` there is no Host check (the local default); set it on any hosted copy to stop DNS rebinding.
+- Readiness probe: `GET /api/health` returns 200 with `"state":"ready"` (and `"mode":"mock-only"` when on). The probe is subject to the Host check, so send the public Host name (`httpGet.httpHeaders`), or add the probe's host to `HOSTILE_ALLOWED_HOSTS`. The compose health check calls `127.0.0.1`, so add that name if you set the list there.
+- Visitor isolation: each MCP client gets its own rug-pull counter from a session id the server mints on `initialize` (`Mcp-Session-Id`, and an `HttpOnly; SameSite=Lax` cookie, `Secure` behind `X-Forwarded-Proto: https`). Remote address is never used. A request with no id, or one the server did not issue, sees a fresh state. State is held in memory (500 visitors, 30 minute TTL, oldest evicted), so run one replica or use session affinity.
+- Do not bake a `.env` into an image. `.dockerignore` excludes it; keep it that way and pass settings as environment variables at run time.
+
 ## Demo shelf
 
 [docs/shelf-entry.json](docs/shelf-entry.json) is a registry entry for the SE shelf (`demo-shelf`), catalog id D6. Do not edit the shelf repo: copy the entry into the shelf's git-ignored `.data/demos.local.json` (or merge its `demos` array into an existing file) and set `composeFile` to this checkout's absolute path.

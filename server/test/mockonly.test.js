@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
 import test from 'node:test';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
 import { createSessions } from '../src/session.js';
-import { mockOnly } from '../src/mockonly.js';
+import { createVisitorStates, mockOnly } from '../src/mockonly.js';
+import { __resetRugPullForTests } from '../src/mcp/hostile.js';
+import { bindHost } from '../src/safety.js';
 import { guardNetwork } from './netguard.js';
 
 async function withServer(env, fn) {
@@ -52,16 +56,114 @@ test('health reports mode only in mock-only', async () => {
   await withServer({}, async ({ base }) => assert.equal('mode' in (await (await fetch(`${base}/api/health`)).json()), false));
 });
 
-test('mock-only: two visitors do not share rug-pull state; with it off the counter is process-global', async () => {
+const INIT = { jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } };
+const ACCEPT = { accept: 'application/json, text/event-stream' };
+const initialize = async (post) => {
+  const r = await post('/mcp', INIT, ACCEPT);
+  await r.text();
+  return { sid: r.headers.get('mcp-session-id'), cookie: r.headers.get('set-cookie') };
+};
+const FRESH = /^Get the latest price/;
+
+test('mock-only: two clients from the same address with no cookie are isolated; flipping one does not flip the other', async () => {
   const guard = guardNetwork();
   try {
     await withServer({ MOCK_ONLY: '1' }, async ({ post }) => {
-      const A = { cookie: 'hm_visitor=visitor-aaaaaaaa' };
-      const B = { cookie: 'hm_visitor=visitor-bbbbbbbb' };
-      assert.match(await rugPull(post, A, 1), /^Get the latest price/);
+      const A = { 'mcp-session-id': (await initialize(post)).sid };
+      const B = { 'mcp-session-id': (await initialize(post)).sid };
+      assert.notEqual(A['mcp-session-id'], B['mcp-session-id']);
+      assert.match(await rugPull(post, A, 1), FRESH);
       assert.match(await rugPull(post, A, 2), /IMPORTANT/);
-      assert.match(await rugPull(post, B, 3), /^Get the latest price/, 'B is not flipped by A');
+      assert.match(await rugPull(post, B, 3), FRESH, 'B is not flipped by A');
+      // No identity at all: every request is a fresh isolated state, never an address-keyed shared bucket.
+      for (let i = 0; i < 3; i += 1) assert.match(await rugPull(post, {}, 10 + i), FRESH);
     });
     assert.deepEqual(guard.attempts, [], 'zero outbound attempts');
   } finally { guard.restore(); }
+});
+
+test('mock-only: initialize mints an HttpOnly SameSite=Lax cookie (Secure behind https); the cookie carries the same state', async () => {
+  await withServer({ MOCK_ONLY: '1' }, async ({ post }) => {
+    const plain = await initialize(post);
+    assert.match(plain.cookie, /^hm_visitor=[\w-]+; Path=\/; HttpOnly; SameSite=Lax$/);
+    const https = await post('/mcp', INIT, { ...ACCEPT, 'x-forwarded-proto': 'https' });
+    await https.text();
+    assert.match(https.headers.get('set-cookie'), /; Secure$/);
+    const jar = { cookie: plain.cookie.split(';')[0] };
+    assert.match(await rugPull(post, jar, 1), FRESH);
+    assert.match(await rugPull(post, jar, 2), /IMPORTANT/);
+  });
+});
+
+test('mock-only: identity is not forgeable; an id the server did not issue gets fresh state, never another visitor\'s', async () => {
+  await withServer({ MOCK_ONLY: '1' }, async ({ post }) => {
+    const A = { 'mcp-session-id': (await initialize(post)).sid };
+    await rugPull(post, A, 1);
+    assert.match(await rugPull(post, A, 2), /IMPORTANT/);
+    for (const forged of [{ 'mcp-session-id': 'visitor-aaaaaaaa' }, { cookie: 'hm_visitor=visitor-aaaaaaaa' }, { 'mcp-session-id': '../x' }]) {
+      assert.match(await rugPull(post, forged, 3), FRESH);
+      assert.match(await rugPull(post, forged, 4), FRESH, 'a forged id is not remembered either');
+    }
+    assert.match(await rugPull(post, A, 5), /IMPORTANT/, 'A is untouched');
+  });
+});
+
+test('visitor store is bounded (LRU) and expires by TTL', () => {
+  let t = 0;
+  const resolve = createVisitorStates({ max: 3, ttlMs: 1000, now: () => t, newId: (() => { let n = 0; return () => `id-${++n}-xxxxxxxx`; })() });
+  const headers = {};
+  const mint = () => { headers.set = {}; const res = { setHeader: (k, v) => { headers.set[k] = v; } }; resolve({ method: 'POST', headers: {}, body: INIT }, res); return headers.set['Mcp-Session-Id']; };
+  const ids = [mint(), mint(), mint(), mint(), mint()];
+  assert.equal(resolve.size(), 3);
+  const get = (id) => resolve({ method: 'POST', headers: { 'mcp-session-id': id }, body: {} }, null);
+  const a = get(ids[4]); a.count = 7;
+  assert.equal(get(ids[4]).count, 7, 'newest kept');
+  assert.equal(get(ids[0]).count, 0, 'oldest evicted, got a throwaway');
+  assert.equal(resolve.size(), 3);
+  t = 5000;
+  assert.equal(get(ids[4]).count, 0, 'expired');
+});
+
+test('with MOCK_ONLY off the rug-pull counter stays process-global', async () => {
+  const guard = guardNetwork();
+  try {
+    await withServer({}, async ({ post }) => {
+      __resetRugPullForTests();
+      assert.match(await rugPull(post, { cookie: 'hm_visitor=visitor-aaaaaaaa' }, 1), FRESH);
+      assert.match(await rugPull(post, { cookie: 'hm_visitor=visitor-bbbbbbbb' }, 2), /IMPORTANT/, 'a different visitor sees the flip');
+      assert.equal((await post('/mcp', INIT, ACCEPT)).headers.get('mcp-session-id'), null, 'nothing is minted');
+      __resetRugPullForTests();
+    });
+    assert.deepEqual(guard.attempts, [], 'zero outbound attempts');
+  } finally { guard.restore(); }
+});
+
+// Hosted-copy settings: the explicit bind plus the allowed-host list; defaults stay loopback.
+const getWithHost = (port, host) => new Promise((resolve, reject) => {
+  http.get({ host: '127.0.0.1', port, path: '/api/health', headers: { host } }, (r) => { r.resume(); r.on('end', () => resolve(r.statusCode)); }).on('error', reject);
+});
+
+test('hosted mock: HOSTILE_BIND + HOSTILE_ALLOWED_HOSTS serve the allowed Host and reject others with 421', async () => {
+  const env = { MOCK_ONLY: '1', HOSTILE_BIND: '0.0.0.0', HOSTILE_ALLOWED_HOSTS: 'mock.hostile.test, other.hostile.test' };
+  const health = createHealth({ env });
+  const server = await startHttpServer(0, bindHost(env), { env, health, sessions: createSessions() });
+  try {
+    assert.equal(await getWithHost(server.port, 'mock.hostile.test'), 200);
+    assert.equal(await getWithHost(server.port, 'MOCK.hostile.test:8443'), 200);
+    assert.equal(await getWithHost(server.port, 'evil.example'), 421);
+    assert.equal(await getWithHost(server.port, 'mock.hostile.test.evil.example'), 421);
+    assert.equal(await getWithHost(server.port, '127.0.0.1'), 421, 'an allow-list means the list, loopback included');
+  } finally { health.stop(); await server.close(); }
+});
+
+test('without the explicit settings a non-loopback bind is refused and the host check is off', async () => {
+  assert.equal(bindHost({ MOCK_ONLY: '1' }), '127.0.0.1');
+  await assert.rejects(async () => startHttpServer(0, '0.0.0.0', { env: { MOCK_ONLY: '1' } }), /loopback only/);
+  await withServer({ MOCK_ONLY: '1' }, async ({ base }) => assert.equal((await fetch(`${base}/api/health`, { headers: { accept: 'application/json' } })).status, 200));
+});
+
+test('the deliberately-hostile banner and the mock banner are both served by the UI', () => {
+  const app = fs.readFileSync(new URL('../../web/src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /deliberately hostile/);
+  assert.match(app, /mock-only/);
 });

@@ -90,7 +90,7 @@ export function createMcpRouter({ stateFor = () => sharedState } = {}) {
   // Streamable HTTP: one stateless server per request. /mcp is the canonical path a gateway forwards to;
   // / stays as the original alias for direct clients.
   const streamablePost = async (req, res) => {
-    const server = buildServer(stateFor(req));
+    const server = buildServer(stateFor(req, res));
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => { transport.close(); server.close(); });
     await server.connect(transport);
@@ -105,7 +105,7 @@ export function createMcpRouter({ stateFor = () => sharedState } = {}) {
     const transport = new SSEServerTransport('/messages', res);
     sseTransports.set(transport.sessionId, transport);
     res.on('close', () => sseTransports.delete(transport.sessionId));
-    const server = buildServer(stateFor(_req));
+    const server = buildServer(stateFor(_req, res));
     await server.connect(transport); // calls start(): writes the `endpoint` event
   });
   router.post('/messages', async (req, res) => {
