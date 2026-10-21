@@ -30,8 +30,9 @@ export function mockOnlyGuard(enabled) {
 // https) and is looked up only in this server's own map. Neither the remote address nor an id the client invents is ever
 // a key: a request with no identity, or one this server did not issue, gets a throwaway fresh state, so nobody shares a
 // bucket and nobody can read another visitor's state without guessing a 122-bit id. The map is capped (LRU) with a TTL.
-// A flood of `initialize` calls can still evict real visitors, which only resets their demo.
-export function createVisitorStates({ max = 500, ttlMs = 30 * 60_000, now = Date.now, newId = randomUUID } = {}) {
+// Minting is rate-limited per source address (the address only throttles minting, it is never a state key), so a flood
+// of `initialize` calls cannot churn the map: over the limit, a caller gets throwaway state and no cookie.
+export function createVisitorStates({ max = 5000, ttlMs = 30 * 60_000, now = Date.now, newId = randomUUID, mintsPerMin = 120 } = {}) {
   const states = new Map(); // id -> { state, touched }; Map order = least recently used first
   const live = (id) => {
     const e = states.get(id);
@@ -41,12 +42,22 @@ export function createVisitorStates({ max = 500, ttlMs = 30 * 60_000, now = Date
     states.delete(id); states.set(id, e);
     return e.state;
   };
+  const mints = new Map(); // source -> { start, n } fixed one-minute window
+  const mintAllowed = (req) => {
+    const src = req.socket?.remoteAddress || 'unknown';
+    const t = now();
+    for (const [k, w] of mints) { if (t - w.start >= 60_000) mints.delete(k); }
+    const w = mints.get(src) || { start: t, n: 0 };
+    mints.set(src, w);
+    return ++w.n <= mintsPerMin;
+  };
   const isInit = (b) => (Array.isArray(b) ? b : [b]).some((m) => m?.method === 'initialize');
   const resolve = (req, res) => {
     const cookie = /(?:^|;\s*)hm_visitor=([\w-]{8,64})/.exec(req.headers.cookie || '')?.[1];
     const known = live(String(req.headers['mcp-session-id'] || '')) || live(cookie || '');
     if (known) return known;
     if (!res || req.method !== 'POST' || !isInit(req.body)) return createListState();
+    if (!mintAllowed(req)) return createListState();
     for (const [id, e] of states) { if (now() - e.touched > ttlMs) states.delete(id); }
     while (states.size >= max) states.delete(states.keys().next().value);
     const id = newId();
