@@ -4,6 +4,7 @@ import Run from "./pages/Run.jsx";
 import RugPull from "./pages/RugPull.jsx";
 import Limits from "./pages/Limits.jsx";
 import Diagram from "./pages/Diagram.jsx";
+import { getHealth } from "./lib/api.js";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
 export const PAGES = [
@@ -23,8 +24,10 @@ const pageFromHash = () => {
 export default function App() {
   const [page, setPage] = useState(pageFromHash);
   const [theme, setTheme] = useState(() => (["light", "dark"].includes(read("hostile.theme", "")) ? read("hostile.theme", "") : "system"));
+  const [mockOnly, setMockOnly] = useState(false);
   const [present, setPresent] = useState(() => read("hostile.present", "0") === "1");
 
+  useEffect(() => { getHealth().then((h) => setMockOnly(h?.mode === "mock-only")).catch(() => {}); }, []);
   useEffect(() => {
     const on = () => setPage(pageFromHash());
     window.addEventListener("hashchange", on);
@@ -47,6 +50,7 @@ export default function App() {
       <div className="banner" role="note" data-testid="banner">
         <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
       </div>
+      {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted mock: sample data only, nothing leaves this server</div>}
       <header className="top">
         <h1>Hostile MCP</h1>
         <nav aria-label="Pages">
