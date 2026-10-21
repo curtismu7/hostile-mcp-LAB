@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createMcpRouter, TOOLS } from './mcp/hostile.js';
-import { assertBindAllowed, bindHost, payloadCorpus, scanPayloads } from './safety.js';
+import { assertBindAllowed, bindHost, hostGuard, payloadCorpus, scanPayloads } from './safety.js';
 import { catalog } from './catalog.js';
 import { createVisitorStates, mockOnly, mockOnlyGuard } from './mockonly.js';
 import { createHealth } from './health.js';
@@ -26,6 +26,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   const mock = mockOnly(env);
   const app = express();
   app.disable('x-powered-by');
+  app.use(hostGuard(env));
 
   const api = express.Router();
   api.use(express.json({ limit: '8kb' }));
@@ -96,7 +97,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
 
 // Boot on `port` (0 = ephemeral). Refuses a non-loopback host unless HOSTILE_BIND is set.
 export function startHttpServer(port = Number(process.env.PORT) || 4701, host = bindHost(process.env), opts) {
-  assertBindAllowed(host);
+  assertBindAllowed(host, opts?.env ?? process.env);
   return new Promise((resolve, reject) => {
     const httpServer = createApp(opts).listen(port, host);
     httpServer.once('error', reject);

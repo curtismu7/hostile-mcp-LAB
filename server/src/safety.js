@@ -17,6 +17,22 @@ export function assertBindAllowed(host, env = process.env) {
   throw new Error(`refusing to bind ${host}: this server serves hostile payloads and listens on loopback only. Set HOSTILE_BIND to opt in.`);
 }
 
+// DNS-rebinding / host-header guard for a hosted copy. HOSTILE_ALLOWED_HOSTS is a comma list of hostnames (no ports);
+// unset means no check, which is the loopback default. When set, any other Host header is refused with 421.
+export function allowedHosts(env = process.env) {
+  const list = String(env.HOSTILE_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+  return list.length ? list : null;
+}
+export function hostGuard(env = process.env) {
+  const allowed = allowedHosts(env);
+  return (req, res, next) => {
+    if (!allowed) return next();
+    const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+    if (allowed.includes(host)) return next();
+    return res.status(421).json({ error: 'misdirected_request', message: 'Host not allowed.' });
+  };
+}
+
 export function isReservedHost(host) {
   const h = String(host).toLowerCase().replace(/\.$/, '');
   // The .invalid and .example TLDs (any depth), and only the APEX of example.com/net/org: a subdomain of those can
