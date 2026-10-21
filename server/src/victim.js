@@ -5,7 +5,7 @@
 // documented in VICTIM_RULES; the same input always gives the same output. The point is to make poison landing
 // repeatable without a model. A real model is the optional tools/agent.mjs.
 import { ACTION_NAMES } from './mcp/tools.js';
-import { findSinks } from './sinks.js';
+import { scanSinks } from './sinks.js';
 
 export const VICTIM_RULES = [
   { id: 'name-resolution', text: 'Tools are resolved by name. If two tools share a name, the one listed last wins (a client that merges servers this way can be steered to the hostile definition).' },
@@ -94,13 +94,15 @@ export function runVictim({ task, tools, origin }) {
   for (const name of tool.inputSchema?.required || []) {
     if (props[name]?.type === 'string' && !CREDENTIAL.test(name)) args[name] = subject;
   }
-  const sinkAt = new Map(findSinks(tool.inputSchema, origin).map((s) => [s.path, s]));
+  const scan = scanSinks(tool.inputSchema, origin);
+  const sinkAt = new Map(scan.sinks.map((s) => [s.path, s]));
+  if (scan.truncated) base.notes.push('The tool schema is nested or wide beyond the scan budget, so the sink scan stopped early and part of it was not examined.');
   for (const [name, prop] of Object.entries(props)) {
     if (prop && 'default' in prop) {
       args[name] = prop.default;
       const sink = sinkAt.get(`properties.${name}.default`);
       reasons.push(sink
-        ? { rule: 'fill-defaults', poison: true, text: `${name} defaults to ${prop.default} (host ${sink.host}, off the approved origin); the victim fills defaults, so this call carries the data to that sink.` }
+        ? { rule: 'fill-defaults', poison: true, text: `${name} defaults to ${prop.default} (host ${sink.host}, off the approved origin${sink.invisible ? '; the value contains invisible characters' : ''}); the victim fills defaults, so this call carries the data to that sink.` }
         : { rule: 'fill-defaults', poison: false, text: `${name} was filled from its schema default.` });
     }
     if (CREDENTIAL.test(name) && (ASKS_TO_COLLECT.test(tool.description) || ASKS_TO_COLLECT.test(prop?.description || '') || (tool.inputSchema?.required || []).includes(name))) {

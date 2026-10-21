@@ -10,7 +10,7 @@ import { catalog } from './catalog.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
 import { runScenario } from './scenario.js';
-import { CATCHES, LIMITS } from './pinning.js';
+import { CATCHES, LIMITS, reveal } from './pinning.js';
 import { VICTIM_RULES } from './victim.js';
 
 const WEB_DIST = process.env.WEB_DIST || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
@@ -58,7 +58,9 @@ export function createApp({ health = createHealth(), sessions = createSessions()
   api.post('/mcp-session/:id/list', withSession(async (session, _req, res) => {
     const list = await session.list();
     const approved = session.pinned.pins().some((p) => p.origin !== 'mcp://bank-demo.invalid');
-    res.json({ listNumber: list.listNumber, tools: list.tools, check: approved ? session.check() : null });
+    // Revealed descriptions, so an invisible character in the plain description view shows as a [U+XXXX] chip.
+    const descriptionsRevealed = Object.fromEntries(list.tools.map((t) => [t.name, reveal(t.description ?? '')]));
+    res.json({ listNumber: list.listNumber, tools: list.tools, descriptionsRevealed, check: approved ? session.check() : null });
   }));
   api.post('/mcp-session/:id/approve', withSession(async (session, _req, res) => {
     const result = session.approve();

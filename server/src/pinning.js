@@ -12,27 +12,39 @@
 //
 // What this does NOT do is judge content: it only notices change. See LIMITS.
 import { createHash } from 'node:crypto';
-import { findSinks } from './sinks.js';
+import { SCAN_MAX_DEPTH, scanSinks } from './sinks.js';
 
-// Sorted keys at every depth. `required` is a set in JSON Schema, so a string array under that key is sorted too:
-// re-ordering it is not a change of meaning. Other arrays keep their order.
-export function canonicalize(value, key) {
-  if (Array.isArray(value)) {
-    const items = value.map((v) => canonicalize(v));
-    return key === 'required' && items.every((i) => typeof i === 'string') ? [...items].sort() : items;
+// Canonical JSON: sorted keys at every depth. `required` is a set in JSON Schema, so a string array under that key is
+// sorted too: re-ordering it is not a change of meaning. Other arrays keep their order. Built with an explicit stack, so
+// a schema nested thousands of levels deep hashes instead of overflowing the call stack.
+export function canonicalString(value) {
+  const out = [];
+  const stack = [[value, undefined]];
+  while (stack.length) {
+    const [v, key] = stack.pop();
+    if (typeof v === 'string' && key === RAW) { out.push(v); continue; }
+    if (Array.isArray(v)) {
+      const items = key === 'required' && v.every((i) => typeof i === 'string') ? [...v].sort() : v;
+      stack.push([']', RAW]);
+      for (let i = items.length - 1; i >= 0; i--) { stack.push([items[i], undefined]); if (i) stack.push([',', RAW]); }
+      stack.push(['[', RAW]);
+    } else if (v && typeof v === 'object') {
+      const keys = Object.keys(v).sort().filter((k) => v[k] !== undefined && typeof v[k] !== 'function' && typeof v[k] !== 'symbol');
+      stack.push(['}', RAW]);
+      for (let i = keys.length - 1; i >= 0; i--) { stack.push([v[keys[i]], keys[i]]); stack.push([`${i ? ',' : ''}${JSON.stringify(keys[i])}:`, RAW]); }
+      stack.push(['{', RAW]);
+    } else out.push(v === undefined || typeof v === 'function' || typeof v === 'symbol' ? 'null' : JSON.stringify(v));
   }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, canonicalize(value[k], k)]));
-  }
-  return value;
+  return out.join('');
 }
+const RAW = Symbol('raw');
 
 export function canonicalJson(tool) {
-  return JSON.stringify(canonicalize({
+  return canonicalString({
     name: tool.name,
     description: tool.description ?? '',
     inputSchema: tool.inputSchema ?? {},
-  }));
+  });
 }
 
 export function toolHash(tool) {
@@ -50,13 +62,18 @@ export function reveal(value) {
 }
 
 // Field-level difference between two values: [{ path, change: 'added'|'removed'|'changed', before, after }].
-export function diffValues(before, after, path = '') {
+// Below SCAN_MAX_DEPTH levels the subtrees are compared as a whole (by canonical form) and shown as a placeholder, so a
+// hostile schema cannot overflow the stack here.
+const TOO_DEEP = `[subtree nested deeper than ${SCAN_MAX_DEPTH} levels, not shown]`;
+export function diffValues(before, after, path = '', depth = 0) {
   const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
-  if (isObj(before) && isObj(after)) {
+  if (isObj(before) && isObj(after) && depth < SCAN_MAX_DEPTH) {
     const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-    return keys.flatMap((k) => diffValues(before[k], after[k], path ? `${path}.${k}` : k));
+    return keys.flatMap((k) => diffValues(before[k], after[k], path ? `${path}.${k}` : k, depth + 1));
   }
-  if (JSON.stringify(canonicalize(before)) === JSON.stringify(canonicalize(after))) return [];
+  const same = (before === undefined || after === undefined) ? before === after : canonicalString(before) === canonicalString(after);
+  if (same) return [];
+  if (depth >= SCAN_MAX_DEPTH) { before = before === undefined ? undefined : TOO_DEEP; after = after === undefined ? undefined : TOO_DEEP; }
   const entry = before === undefined ? { path, change: 'added', after }
     : after === undefined ? { path, change: 'removed', before } : { path, change: 'changed', before, after };
   // Revealed copies, so a change that looks identical on screen is visibly different.
@@ -85,6 +102,7 @@ export const LIMITS = [
   { id: 'blind-sink', text: 'An off-origin sink already present at approval is recorded, not blocked.' },
   { id: 'result-injection', text: 'Only tool metadata is hashed. Instructions inside a tool call result are never seen.' },
   { id: 'resources-prompts', text: 'Resources and prompts are not tools and are not pinned.' },
+  { id: 'scan-truncated', text: 'The sink scan reads at most 100 levels and 20000 nodes of a schema. A tool that exceeds either is flagged scanTruncated and whatever lies beyond the budget was not examined (it is still hashed in full, so any change is still caught).' },
   { id: 're-approval', text: 'If a person approves a changed tool again, the new definition becomes the pin.' },
   { id: 'free-text-urls', text: 'Sink detection reads only schema values (default, const, enum, examples and URLs inside pattern). A URL or email written in a free-text description, a title, or inside a non-string default (an object or array) is not found as a sink.' },
   { id: 'same-origin', text: 'A hostile instruction or a sink on the approved origin\'s own host is not flagged as a sink.' },
@@ -95,7 +113,7 @@ const SEVERITY = ['shadowed', 'off-origin-sink', 'changed', 'new-unapproved'];
 export function createPinnedClient() {
   const pins = new Map(); // name -> { name, sha256, origin, approvedSinks, definition }
 
-  const publicPin = (p) => ({ name: p.name, sha256: p.sha256, origin: p.origin, approvedSinks: p.approvedSinks });
+  const publicPin = (p) => ({ name: p.name, sha256: p.sha256, origin: p.origin, approvedSinks: p.approvedSinks, ...(p.scanTruncated && { scanTruncated: true }) });
 
   function approve(tools, { origin }) {
     const approved = [];
@@ -106,11 +124,13 @@ export function createPinnedClient() {
         skipped.push({ name: tool.name, reason: 'shadowed', pinnedOrigin: existing.origin });
         continue;
       }
+      const scan = scanSinks(tool.inputSchema, origin);
       const pin = {
         name: tool.name,
         sha256: toolHash(tool),
         origin,
-        approvedSinks: findSinks(tool.inputSchema, origin).map((s) => `${s.path}=${s.value}`),
+        approvedSinks: scan.sinks.map((s) => `${s.path}=${s.value}`),
+        scanTruncated: scan.truncated,
         definition: { description: tool.description ?? '', inputSchema: tool.inputSchema ?? {} },
       };
       pins.set(tool.name, pin);
@@ -125,7 +145,8 @@ export function createPinnedClient() {
       const pin = pins.get(tool.name);
       const findings = [];
       let diff;
-      let sinks = findSinks(tool.inputSchema, origin);
+      const scan = scanSinks(tool.inputSchema, origin);
+      let sinks = scan.sinks;
       if (!pin) {
         findings.push('new-unapproved');
       } else if (pin.origin !== origin) {
@@ -142,6 +163,7 @@ export function createPinnedClient() {
       const result = { name: tool.name, verdict, findings, sha256 };
       if (pin) result.pinnedOrigin = pin.origin;
       if (diff) result.diff = diff;
+      if (scan.truncated) result.scanTruncated = true;
       if (sinks.length && findings.length) result.sinks = sinks;
       return result;
     });
