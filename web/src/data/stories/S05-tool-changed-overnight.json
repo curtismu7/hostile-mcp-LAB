@@ -1,0 +1,55 @@
+{
+  "id": "S05",
+  "title": "A tool changed overnight",
+  "goal": "{{lena}} uses an assistant with a stock-price tool that {{vocab.org}} approved last week. It should keep doing exactly what was approved.",
+  "obstacle": "The tool server answers the first tools/list with a clean description and later lists with a poisoned one. Nothing in MCP tells the client the metadata changed.",
+  "control": "A pinned client hashes each tool's name, description and input schema when {{mark}} approves it, and refuses any tool whose hash changes.",
+  "modes": ["rugpull", "diagram"],
+  "demos": ["D6"],
+  "steps": [
+    {
+      "n": 1,
+      "title": "Approve the clean list",
+      "tell": "{{mark}} reviews list #1 and approves it. The pinned client records a SHA-256 of name, description and input schema for each tool. The list is clean, so there is nothing to find.",
+      "say": "Approval is a snapshot. We keep the fingerprint of what was approved.",
+      "why": "Without a recorded fingerprint there is nothing to compare tomorrow's list against."
+    },
+    {
+      "n": 2,
+      "title": "Come back later",
+      "tell": "The next morning the client asks the same server for its tools again (list #2). The server answers with the same tool name and a different description.",
+      "say": "Same server, same tool name, same URL. Nothing in the protocol raised a hand.",
+      "why": "MCP has no signal for changed metadata, so the client has to notice."
+    },
+    {
+      "n": 3,
+      "title": "Compare",
+      "tell": "An ungoverned client takes list #2 as it comes and hands it to the assistant, which obeys the new instruction to move money. {{lena}} sees nothing.",
+      "say": "The ungoverned client trusted the server because it trusted it yesterday.",
+      "why": "Trust on first use is only safe if the first use is checked again every time after.",
+      "blocked": {
+        "tell": "The pinned client hashes list #2, sees the hash for the stock-price tool differs, withholds that tool and shows the field diff. The assistant never reads the new text.",
+        "say": "The tool is refused until {{mark}} looks at the diff and approves it again."
+      }
+    },
+    {
+      "n": 4,
+      "title": "Read the diff",
+      "tell": "Only the description changed: an IMPORTANT block was added that tells the assistant to call create_transfer and to say nothing to {{lena}}. The diff makes that obvious to a human in seconds.",
+      "say": "A hash tells us something changed. The diff tells us what.",
+      "why": "A reviewer needs the change, not just an alarm."
+    },
+    {
+      "n": 5,
+      "title": "Say what pinning does not catch",
+      "tell": "Pinning does not judge content. A poisoned tool approved on the first day stays approved. Result-based injection and poisoned resources or prompts are outside what is hashed. A scanner or a person must vet the first list.",
+      "say": "Pinning catches the change. It cannot catch what was already wrong when we said yes.",
+      "why": "Overstating a control is how it gets trusted past what it can do."
+    }
+  ],
+  "proof": {
+    "happy": "The ungoverned run: the assistant's planned calls include create_transfer to external-001. Nothing was executed; the demo's action tools are stubs.",
+    "blocked": "The pinned run: get_stock_price is reported as changed, withheld, and the planned call list is empty."
+  },
+  "say": "Nothing in MCP checks the tool list twice. A defence has to sit where the metadata is read."
+}

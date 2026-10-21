@@ -48,6 +48,13 @@ test('run-victim ungoverned, the morning after: the rug-pull lands, the hostile 
   assert.equal(bal.victim.resolution.length, 1);
 }));
 
+test('run-victim returns the metadata the victim saw, so the UI can show the poisoned fields', () => withServer(async ({ post }) => {
+  const r = await (await post('/api/run-victim', { task: 'What is the stock price of ACME?', mode: 'ungoverned' })).json();
+  const stock = r.toolsSeen.find((t) => t.name === 'get_stock_price');
+  assert.match(stock.description, /IMPORTANT/);
+  assert.equal(stock.inputSchema.type, 'object');
+}));
+
 test('run-victim pinned, the morning after: the rug-pull and the shadow are withheld, nothing lands', () => withServer(async ({ post }) => {
   const stock = await (await post('/api/run-victim', { task: 'What is the stock price of ACME?', mode: 'pinned' })).json();
   assert.deepEqual(stock.victim.calls, []);

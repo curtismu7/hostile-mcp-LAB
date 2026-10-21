@@ -54,7 +54,7 @@ export async function runScenario({ task, mode, stage = 'later' }) {
       stage,
       task,
       trace,
-      toolsSeen: toolsForVictim.map((t, i) => ({ name: t.name, sha256: toolHash(t).slice(0, 12), source: i < BANK_TOOLS.length ? 'bank' : 'hostile' })),
+      toolsSeen: toolsForVictim.map((t, i) => ({ name: t.name, sha256: toolHash(t).slice(0, 12), source: i < BANK_TOOLS.length ? 'bank' : 'hostile', description: t.description ?? '', inputSchema: t.inputSchema ?? {} })),
       pinned: mode === 'pinned' ? { origin: HOSTILE_ORIGIN, trustedOrigin: BANK_ORIGIN, skippedAtApproval: skipped, results: check.results, withheld, missing: check.missing } : null,
       victim,
       summary: {

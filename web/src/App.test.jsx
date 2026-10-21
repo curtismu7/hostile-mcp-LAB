@@ -1,26 +1,32 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
-import App from "./App.jsx";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import App, { PAGES } from "./App.jsx";
+import { catalog, mockFetch } from "./test/fixtures.js";
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => { window.location.hash = ""; localStorage.clear(); vi.stubGlobal("fetch", vi.fn(mockFetch({ "GET /api/catalog": catalog }))); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const catalog = {
-  items: [{ id: "rug_pull", name: "get_stock_price", category: "dynamic", how: "Swapped on the next list.", scanner: { catches: "partial", note: "Only if rescanned." }, pinning: { catches: "yes", note: "Caught as changed." } }],
-  pinningLimits: [{ id: "first-list-poison", text: "A poisoned tool approved on first sight stays approved." }],
-};
-
-test("shows each poison with its honest scanner and pinning answer, and the limits", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => catalog })));
+test("the hostile-server banner is on screen on every page", async () => {
   render(<App />);
-  expect(await screen.findByText("get_stock_price")).toBeInTheDocument();
-  expect(screen.getByText("Partly")).toBeInTheDocument();
-  expect(screen.getByText("Catches")).toBeInTheDocument();
-  expect(screen.getByText(/approved on first sight stays approved/)).toBeInTheDocument();
+  for (const [id, label] of PAGES) {
+    await userEvent.click(screen.getByRole("link", { name: label }));
+    expect(screen.getByTestId("banner")).toHaveTextContent(/deliberately hostile/i);
+    expect(screen.getByTestId("banner")).toHaveTextContent(/inert/i);
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+    expect(window.location.hash).toBe(`#/${id}`);
+  }
 });
 
-test("says so when the API is not reachable", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503 })));
+test("the presenter toggle and the theme button set their flags on the document", async () => {
   render(<App />);
-  expect(await screen.findByRole("alert")).toHaveTextContent("HTTP 503");
+  await userEvent.click(screen.getByRole("button", { name: "Present" }));
+  expect(document.documentElement.dataset.present).toBe("1");
+  await userEvent.click(screen.getByRole("button", { name: "Present" }));
+  expect(document.documentElement.dataset.present).toBeUndefined();
+  await userEvent.click(screen.getByRole("button", { name: /Theme/ }));
+  expect(document.documentElement.dataset.theme).toBe("light");
+  await userEvent.click(screen.getByRole("button", { name: /Theme/ }));
+  expect(document.documentElement.dataset.theme).toBe("dark");
 });

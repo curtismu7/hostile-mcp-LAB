@@ -6,15 +6,15 @@ Nothing in the MCP protocol inspects tool metadata. The server serves the payloa
 
 ## Status
 
-Step HM0 (server, victim, pinned client, API). Built and tested:
+Steps HM0 (server, victim, pinned client, API) and HM1 (web). Built and tested:
 
 - The hostile server, ported from the AI-DEMO2 `standalone/hostile-mcp-server`: Streamable HTTP and SSE, `/health`, 11 tools (6 with poisoned metadata, the rug-pull tool, a result-injection tool, 3 inert action stubs), one poisoned resource, one poisoned prompt. The wire output is checked byte for byte against the source.
 - The offline, deterministic victim (`server/src/victim.js`).
 - The pinned client library (`server/src/pinning.js`).
 - The API, including `GET /api/health` (`demo-health/1`).
-- A skeleton web page that lists the poison catalog and what pinning does not catch.
+- The web UI: gallery (badges: pinning, scanner, neither), run the victim (ungoverned and pinned side by side), the three-step rug-pull flow, the honest limits page, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), stories S05 and S14 with the Allowed/Blocked switch and generic, airlines and banking packs, a presenter toggle, light and dark themes. Untrusted strings render as inert text only; a banner on every page says the server is hostile on purpose.
 
-Not built yet: the side-by-side story screen, the ReactFlow diagram (movable boxes, Simulate, Reset, speed), Docker, the shelf registration. The optional real-model agent (`npm run agent -w server`) is copied from the source and tested offline only; it has not been run against a live model from this repo.
+Not built yet: Docker, the shelf registration. The optional real-model agent (`npm run agent -w server`) is copied from the source and tested offline only; it has not been run against a live model from this repo.
 
 ## Safety rules
 
