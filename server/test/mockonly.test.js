@@ -167,3 +167,24 @@ test('the deliberately-hostile banner and the mock banner are both served by the
   assert.match(app, /deliberately hostile/);
   assert.match(app, /mock-only/);
 });
+
+test('an initialize flood from one source cannot evict another visitor\'s state', () => {
+  const resolve = createVisitorStates({ max: 500 });
+  const res = () => ({ setHeader() {} });
+  const init = (addr) => ({ method: 'POST', headers: {}, body: { method: 'initialize' }, socket: { remoteAddress: addr } });
+  const a = init('10.0.0.1'); const ra = res();
+  let id; ra.setHeader = (k, v) => { if (k === 'Mcp-Session-Id') id = v; };
+  const stateA = resolve(a, ra); stateA.count = 5;
+  for (let i = 0; i < 3000; i += 1) resolve(init('10.0.0.9'), res());
+  assert.equal(resolve({ method: 'POST', headers: { 'mcp-session-id': id }, body: {}, socket: { remoteAddress: '10.0.0.1' } }, res()).count, 5);
+});
+
+test('an oversize /mcp body gets a JSON 413 with no stack or paths', async () => {
+  await withServer({}, async ({ base }) => {
+    const r = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pad: 'x'.repeat(200_000) }) });
+    const t = await r.text();
+    assert.equal(r.status, 413);
+    assert.deepEqual(JSON.parse(t), { error: 'payload_too_large' });
+    assert.ok(!/node_modules|\/Users\//.test(t));
+  });
+});
