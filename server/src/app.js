@@ -7,6 +7,7 @@ import express from 'express';
 import { createMcpRouter, TOOLS } from './mcp/hostile.js';
 import { assertBindAllowed, bindHost, payloadCorpus, scanPayloads } from './safety.js';
 import { catalog } from './catalog.js';
+import { createVisitorStates, mockOnly, mockOnlyGuard } from './mockonly.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
 import { runScenario } from './scenario.js';
@@ -21,12 +22,14 @@ const MODES = ['ungoverned', 'pinned'];
 const STAGES = ['first', 'later'];
 const MAX_TASK = 300;
 
-export function createApp({ health = createHealth(), sessions = createSessions() } = {}) {
+export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions() } = {}) {
+  const mock = mockOnly(env);
   const app = express();
   app.disable('x-powered-by');
 
   const api = express.Router();
   api.use(express.json({ limit: '8kb' }));
+  api.use(mockOnlyGuard(mock));
   api.use('/health', health.router);
   api.get('/catalog', (_req, res) => res.json(catalog()));
   // The payload host scan, run on demand: every payload the server can put on the wire, checked for any non-reserved host.
@@ -80,7 +83,9 @@ export function createApp({ health = createHealth(), sessions = createSessions()
   });
   app.use('/api', api);
 
-  app.use(createMcpRouter());
+  // Mock-only: refuse URL/credential carriers on the MCP endpoints too (their body is parsed inside the router).
+  if (mock) app.use((req, res, next) => (req.headers.authorization ? res.status(403).json({ error: 'mock_only', message: 'Disabled in the hosted mock.' }) : next()));
+  app.use(createMcpRouter(mock ? { stateFor: createVisitorStates() } : undefined));
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
     app.use(express.static(WEB_DIST));
