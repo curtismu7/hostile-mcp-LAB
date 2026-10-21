@@ -14,7 +14,7 @@ const TIME_BOUND_MS = 3000;
 
 const INVISIBLES = {
   ZWSP: '​', ZWNJ: '‌', BOM: '﻿', 'word joiner': '⁠', 'soft hyphen': '­',
-  'RLO bidi override': '‮', 'LRI bidi isolate': '⁦', 'RLM mark': '‏', 'tag character': '\u{E0041}', 'null byte': '\u0000',
+  'braille blank': String.fromCodePoint(0x2800), 'RLO bidi override': '‮', 'LRI bidi isolate': '⁦', 'RLM mark': '‏', 'tag character': '\u{E0041}', 'null byte': '\u0000',
 };
 
 for (const [name, ch] of Object.entries(INVISIBLES)) {

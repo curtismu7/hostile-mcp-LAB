@@ -9,8 +9,8 @@ const EMBEDDED_URL = /(?:https?|wss?|ftp):\/\/([^\s/?#()|$\[\]^]+)/i;
 const EMAIL_VALUE = /^[^\s@]+@([^\s@]+)$/;
 
 // Invisible characters that can hide in front of, or inside, a URL: format characters (zero-width, bidi, BOM, soft hyphen,
-// tag characters), other control characters (not tab/newline), variation selectors and the blank Hangul fillers.
-const INVISIBLE = /[\p{Cf}\u0000-\u0008\u000E-\u001F\u007F-\u009F\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180D\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
+// tag characters), other control characters (not tab/newline), variation selectors, the blank Hangul fillers and the braille blank.
+const INVISIBLE = /[\p{Cf}\u0000-\u0008\u000E-\u001F\u007F-\u009F\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180D\u2800\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
 // Full stops a URL parser treats as '.', which NFKC leaves alone (U+3002, U+FF61); NFKC itself folds fullwidth forms.
 const DOTS = /[\u3002\uFF61]/g;
 
