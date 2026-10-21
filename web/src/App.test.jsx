@@ -19,6 +19,17 @@ test("the hostile-server banner is on screen on every page", async () => {
   }
 });
 
+test("a skip link is the first tab stop, then the nav in order, then the toolbar; activating it focuses the main region", async () => {
+  render(<App />);
+  const user = userEvent.setup();
+  const order = [];
+  for (let i = 0; i < 8; i++) { await user.tab(); order.push(document.activeElement.textContent); }
+  expect(order).toEqual(["Skip to content", ...PAGES.map(([, l]) => l), "Present", "Theme: system"].slice(0, 8));
+  await user.click(screen.getByRole("link", { name: "Skip to content" }));
+  expect(document.activeElement).toBe(document.getElementById("main"));
+  expect(window.location.hash).toBe("");
+});
+
 test("the presenter toggle and the theme button set their flags on the document", async () => {
   render(<App />);
   await userEvent.click(screen.getByRole("button", { name: "Present" }));

@@ -28,4 +28,16 @@ export function Untrusted({ text, block = false }) {
   );
 }
 
+const CHIP = /(\[U\+[0-9A-F]{4,6}\])/;
+
+/** Text from the server's revealed copy: each [U+XXXX] chip is a visible, styled text node, everything else is inert text. */
+export function Revealed({ text, block = false }) {
+  const Tag = block ? "pre" : "span";
+  return (
+    <Tag className={`untrusted${block ? " untrusted--block" : ""}`} data-testid="revealed">
+      {String(text ?? "").split(CHIP).map((p, i) => (i % 2 ? <span key={i} className="chip" title="Invisible or look-alike character">{p}</span> : <React.Fragment key={i}>{p}</React.Fragment>))}
+    </Tag>
+  );
+}
+
 export const pretty = (value) => JSON.stringify(value, null, 2);

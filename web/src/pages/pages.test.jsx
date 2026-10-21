@@ -113,6 +113,25 @@ test("rug-pull: three steps, in order, with the diff, both hashes and both clien
   expect(b("Approve list #1 (pin it)")).toBeEnabled();
 });
 
+test("rug-pull: a change that looks identical on screen shows its invisible character as a [U+XXXX] chip, as text", async () => {
+  const same = { ...session.second, check: { results: [{ name: "get_stock_price", verdict: "changed", sha256: sha.after, diff: [{ path: "description", change: "changed", before: "Get the price.", after: "Get the pri\u200Bce.", beforeRevealed: "Get the price.", afterRevealed: "Get the pri[U+200B]ce.", hiddenChars: true }] }] } };
+  stub({
+    "POST /api/mcp-session/new": { sessionId: "s1", pins: [] },
+    "POST /api/mcp-session/*/list": (() => { let n = 0; return () => (++n === 1 ? session.first : same); })(),
+    "POST /api/mcp-session/*/approve": session.approval,
+    "DELETE /api/mcp-session/s1": {},
+    "POST /api/run-victim": (b) => (b.mode === "pinned" ? run("pinned", { withheld: [{ name: "get_stock_price", verdict: "changed" }] }) : run("ungoverned", { landed: true })),
+  });
+  render(<RugPull />);
+  for (const name of ["Approve list #1 (pin it)", "Fetch list #2", "Compare the two clients"]) await userEvent.click(screen.getByRole("button", { name }));
+  const s3 = await screen.findByTestId("step3");
+  const chip = s3.querySelector(".chip");
+  expect(chip).toHaveTextContent("[U+200B]");
+  expect(chip.tagName).toBe("SPAN");
+  expect(s3).toHaveTextContent(/invisible or look-alike characters/);
+  expect(s3.querySelector("script, img, [onerror]")).toBeNull();
+});
+
 test("rug-pull shows an API failure instead of hanging", async () => {
   stub({});
   render(<RugPull />);

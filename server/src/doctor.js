@@ -14,7 +14,7 @@ export function runChecks({ env = process.env } = {}) {
 
   const bad = scanPayloads();
   add('payload-hosts', bad.length ? 'fail' : 'pass',
-    bad.length ? `non-reserved hosts in payloads: ${bad.map((b) => `${b.where}: ${b.hosts.join(', ')}`).join('; ')}` : 'every host in every payload is .invalid, .example or example.com/net/org');
+    bad.length ? `non-reserved hosts in payloads: ${bad.map((b) => `${b.where}: ${b.hosts.join(', ')}`).join('; ')}` : 'every host in every payload is .invalid, .example or the apex of example.com/net/org');
 
   add('outbound', env.LLM_URL ? 'info' : 'pass',
     env.LLM_URL ? 'LLM_URL is set; only the optional agent CLI uses it, never the server' : 'no outbound settings (the server makes no outbound request; the real-model agent is off)');

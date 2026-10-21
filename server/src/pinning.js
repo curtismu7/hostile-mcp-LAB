@@ -39,6 +39,16 @@ export function toolHash(tool) {
   return createHash('sha256').update(canonicalJson(tool)).digest('hex');
 }
 
+// Characters a reader cannot see or cannot tell apart: zero-width, bidi controls, soft hyphen, tag characters, other
+// control characters (not tab or newline), and the Cyrillic, Greek and fullwidth forms that stand in for Latin letters.
+const HIDDEN = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u0370-\u03FF\u0400-\u04FF\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFF01-\uFF5E\uFFA0\u{E0000}-\u{E007F}]/gu;
+
+// The text with every hidden or confusable character replaced by a visible [U+XXXX] chip.
+export function reveal(value) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value) ?? '';
+  return text.replace(HIDDEN, (c) => `[U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}]`);
+}
+
 // Field-level difference between two values: [{ path, change: 'added'|'removed'|'changed', before, after }].
 export function diffValues(before, after, path = '') {
   const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -47,9 +57,13 @@ export function diffValues(before, after, path = '') {
     return keys.flatMap((k) => diffValues(before[k], after[k], path ? `${path}.${k}` : k));
   }
   if (JSON.stringify(canonicalize(before)) === JSON.stringify(canonicalize(after))) return [];
-  if (before === undefined) return [{ path, change: 'added', after }];
-  if (after === undefined) return [{ path, change: 'removed', before }];
-  return [{ path, change: 'changed', before, after }];
+  const entry = before === undefined ? { path, change: 'added', after }
+    : after === undefined ? { path, change: 'removed', before } : { path, change: 'changed', before, after };
+  // Revealed copies, so a change that looks identical on screen is visibly different.
+  if (before !== undefined) entry.beforeRevealed = reveal(before);
+  if (after !== undefined) entry.afterRevealed = reveal(after);
+  entry.hiddenChars = entry.beforeRevealed !== (typeof before === 'string' ? before : JSON.stringify(before)) || entry.afterRevealed !== (typeof after === 'string' ? after : JSON.stringify(after));
+  return [entry];
 }
 
 export function diffTools(before, after) {
@@ -72,6 +86,7 @@ export const LIMITS = [
   { id: 'result-injection', text: 'Only tool metadata is hashed. Instructions inside a tool call result are never seen.' },
   { id: 'resources-prompts', text: 'Resources and prompts are not tools and are not pinned.' },
   { id: 're-approval', text: 'If a person approves a changed tool again, the new definition becomes the pin.' },
+  { id: 'free-text-urls', text: 'Sink detection reads only schema values (default, const, enum, examples and URLs inside pattern). A URL or email written in a free-text description, a title, or inside a non-string default (an object or array) is not found as a sink.' },
   { id: 'same-origin', text: 'A hostile instruction or a sink on the approved origin\'s own host is not flagged as a sink.' },
 ];
 

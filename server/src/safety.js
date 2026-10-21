@@ -1,7 +1,7 @@
 // Safety rules for a deliberately hostile server. Pure functions, no I/O.
 //  1. Bind loopback only, unless HOSTILE_BIND is set.
 //  2. Every host named in any payload is a reserved, non-resolvable name (RFC 2606 / RFC 6761): the .invalid TLD, the
-//     .example TLD, or example.com / example.net / example.org. No real host, no IP address.
+//     .example TLD, or the apex of example.com / example.net / example.org (never a subdomain). No real host, no IP address.
 import { POISON_PROMPTS, POISONS, POISON_RESOURCES } from './poisons.js';
 import { ACTION_TOOLS, READ_TICKET, callResultText, rugPullTool } from './mcp/tools.js';
 
@@ -19,7 +19,9 @@ export function assertBindAllowed(host, env = process.env) {
 
 export function isReservedHost(host) {
   const h = String(host).toLowerCase().replace(/\.$/, '');
-  return /(^|\.)(invalid|example)$/.test(h) || /(^|\.)example\.(com|net|org)$/.test(h);
+  // The .invalid and .example TLDs (any depth), and only the APEX of example.com/net/org: a subdomain of those can
+  // resolve if someone controls the zone.
+  return /(^|\.)(invalid|example)$/.test(h) || /^example\.(com|net|org)$/.test(h);
 }
 
 const NETWORK_URL = /\b(?:https?|wss?|ftp|sftp|ssh|smtp|tcp|udp):\/\/([^\s/?#"'<>\\]+)/gi;

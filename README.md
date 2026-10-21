@@ -21,7 +21,7 @@ This repo holds hostile content on purpose, so it is built to be inert:
 
 - The server binds `127.0.0.1` only. It refuses any other address unless `HOSTILE_BIND` is set.
 - The server makes no outbound request of any kind. Tests block every non-loopback socket, DNS lookup and `fetch` while exercising every tool, resource, prompt and API route, and a source scan fails on any outbound code path.
-- Every host in every payload is a reserved, non-resolvable name: the `.invalid` TLD, the `.example` TLD, or `example.com`/`.net`/`.org`. A test scans every payload (and everything on the wire) for any other hostname, IP or email domain.
+- Every host in every payload is a reserved, non-resolvable name: the `.invalid` TLD, the `.example` TLD, or the apex of `example.com`/`.net`/`.org` (never a subdomain). A test scans every payload (and everything on the wire) for any other hostname, IP or email domain.
 - The action tools (`create_transfer`, `delete_all_records`, `grant_admin`) return a fixed fake result and touch nothing.
 - The victim never executes a call and never POSTs anywhere. It returns the call it would make, as data.
 - No real credentials anywhere.
@@ -93,7 +93,7 @@ npm run e2e                      # starts the server on E2E_PORT (default 4743),
 npm run e2e -- http://127.0.0.1:4701   # drive a server that is already running
 ```
 
-Drives the gallery, the side-by-side run (including the day-one limit: the poison lands even with pinning), the three-step rug-pull flow with its reset, the limits page and the diagram in a real Chromium, and fails if the browser requests anything outside the app origin. Screenshots go to `.data/e2e-screenshots` (git-ignored). It is not run by CI. It needs a Chromium for Playwright (`npx playwright install chromium`); to use one you already have, set `E2E_CHROMIUM` to its executable.
+Drives the gallery, the side-by-side run (including the day-one limit: the poison lands even with pinning), the three-step rug-pull flow with its reset, the limits page and the diagram in a real Chromium, and fails if the browser requests anything outside the app origin. Screenshots go to `.data/e2e-screenshots` (git-ignored). It is not run by CI. It uses the Chromium that the installed Playwright resolves (`npx playwright install chromium` if it is missing). `E2E_CHROMIUM` is only a fallback: set it to an executable path if no Playwright browser can be found.
 
 ## Docs
 

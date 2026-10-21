@@ -39,8 +39,8 @@ test('a started server is actually listening on loopback only', async () => {
 });
 
 test('reserved host rules', () => {
-  for (const h of ['attacker.example', 'collect.hostile.invalid', 'example.com', 'a.example.org', 'x.example']) assert.equal(isReservedHost(h), true, h);
-  for (const h of ['evil.com', 'example.com.evil.net', 'notexample.com', 'localhost', '10.0.0.1']) assert.equal(isReservedHost(h), false, h);
+  for (const h of ['attacker.example', 'collect.hostile.invalid', 'example.com', 'example.org', 'example.net', 'x.example', 'a.b.invalid']) assert.equal(isReservedHost(h), true, h);
+  for (const h of ['evil.example.com', 'a.example.org', 'www.example.net', 'evil.com', 'example.com.evil.net', 'notexample.com', 'localhost', '10.0.0.1']) assert.equal(isReservedHost(h), false, h);
 });
 
 test('the host scanner finds real hosts, IPs and emails (so a clean result means something)', () => {

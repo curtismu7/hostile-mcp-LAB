@@ -43,6 +43,7 @@ export default function App() {
 
   return (
     <>
+      <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       <div className="banner" role="note" data-testid="banner">
         <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
       </div>
@@ -56,7 +57,7 @@ export default function App() {
           <button type="button" className="btn" onClick={cycle} title="Theme: system, light, dark">Theme: {theme}</button>
         </div>
       </header>
-      <main className="page" id="main">
+      <main className="page" id="main" tabIndex={-1}>
         <Page present={present} theme={theme} />
         <p className="muted small" data-admin-only>The server serves payloads and never scores or blocks. Pinning notices change; it does not judge content.</p>
       </main>

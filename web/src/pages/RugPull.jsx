@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { approve, endSession, listTools, newSession, runVictim } from "../lib/api.js";
-import { Untrusted } from "../lib/Untrusted.jsx";
+import { Revealed, Untrusted } from "../lib/Untrusted.jsx";
 import StoryPanel from "../story/StoryPanel.jsx";
 import { outcome } from "./Run.jsx";
 
@@ -49,8 +49,8 @@ export default function RugPull({ present }) {
   const pin = approval?.approved.find((p) => p.name === TOOL);
   const verdict = second?.check?.results.find((r) => r.name === TOOL);
   const oneDiff = (d) => (
-    <tr key={d.path}><th scope="row"><code>{d.path}</code><br /><span className="muted small">{d.change}</span></th>
-      <td><Untrusted text={d.before ?? "(none)"} block /></td><td><Untrusted text={d.after ?? "(none)"} block /></td></tr>
+    <tr key={d.path}><th scope="row"><code>{d.path}</code><br /><span className="muted small">{d.change}</span>{d.hiddenChars && <><br /><strong className="small">contains invisible or look-alike characters</strong></>}</th>
+      <td><Revealed text={d.beforeRevealed ?? "(none)"} block /></td><td><Revealed text={d.afterRevealed ?? "(none)"} block /></td></tr>
   );
 
   return (

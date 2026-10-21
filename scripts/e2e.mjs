@@ -6,8 +6,8 @@
 //   npm run e2e              starts the server on E2E_PORT (default 4743), drives it, stops it
 //   npm run e2e -- <url>     drives a server that is already running (read-only except for its in-memory sessions)
 //
-// Needs a Chromium for Playwright (`npx playwright install chromium`). To use one you already have, set E2E_CHROMIUM
-// to its executable. Pattern from the demo shelf's scripts/e2e.mjs. The server makes no outbound request, and neither does this.
+// Uses the Chromium the installed Playwright resolves (`npx playwright install chromium` if missing). E2E_CHROMIUM
+// is only a fallback: an executable path for when no Playwright browser can be found. Pattern from the demo shelf's scripts/e2e.mjs. The server makes no outbound request, and neither does this.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +40,17 @@ try {
   const go = async (hash) => { await page.goto(`${base}/#/${hash}`); await page.reload(); };
   const external = [];
   page.on('request', (r) => { const u = new URL(r.url()); if (u.origin !== new URL(base).origin && !/^(data|blob):/.test(r.url())) external.push(r.url()); });
+
+  // Keyboard order: the skip link is the first stop, then the nav in order; Enter on it moves focus to <main>.
+  await go('gallery');
+  await page.keyboard.press('Tab');
+  check((await page.evaluate(() => document.activeElement.textContent)) === 'Skip to content', 'the first Tab stop is the skip link');
+  await page.keyboard.press('Enter');
+  check(await page.evaluate(() => document.activeElement.id) === 'main', 'the skip link moves focus to the main region');
+  await go('gallery');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  check((await page.evaluate(() => document.activeElement.textContent)) === 'Gallery', 'the next Tab stop after the skip link is the first nav link');
 
   // Gallery
   await go('gallery');
