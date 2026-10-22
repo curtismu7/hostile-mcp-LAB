@@ -55,37 +55,40 @@ export async function createSession({ trusted = true, id = randomUUID() } = {}) 
   return session;
 }
 
-// A small registry for the API: capped, with a time-to-live, oldest evicted first.
-export function createSessions({ max = 20, ttlMs = 15 * 60_000, now = Date.now } = {}) {
-  const live = new Map(); // id -> { session, touched }
-  const sweep = async () => {
-    for (const [id, e] of live) {
-      if (now() - e.touched > ttlMs) { live.delete(id); await e.session.close().catch(() => {}); }
-    }
-    while (live.size >= max) {
-      const [oldest] = live.keys();
-      const e = live.get(oldest); live.delete(oldest); await e.session.close().catch(() => {});
-    }
+// A small registry for the API. Every session belongs to one owner (the visitor that created it): only that owner can
+// read, approve or delete it. Capped per owner (that owner's oldest goes first) and globally (least recently used goes
+// first, set well above the per-owner cap), with a time-to-live.
+export function createSessions({ max = 5000, perOwnerMax = 10, ttlMs = 15 * 60_000, now = Date.now } = {}) {
+  const live = new Map(); // id -> { session, owner, touched }; Map order = oldest first
+  const drop = async (id) => { const e = live.get(id); if (e) { live.delete(id); await e.session.close().catch(() => {}); } };
+  const sweep = async (owner) => {
+    for (const [id, e] of live) { if (now() - e.touched > ttlMs) await drop(id); }
+    const mine = [...live].filter(([, e]) => e.owner === owner).map(([id]) => id);
+    for (const id of mine.slice(0, Math.max(0, mine.length - perOwnerMax + 1))) await drop(id);
+    while (live.size >= max) await drop(live.keys().next().value);
   };
   return {
-    async create(opts) {
-      await sweep();
-      const session = await createSession(opts);
-      live.set(session.id, { session, touched: now() });
+    async create(opts = {}) {
+      const { owner = 'anonymous', ...rest } = opts;
+      await sweep(owner);
+      const session = await createSession(rest);
+      live.set(session.id, { session, owner, touched: now() });
       return session;
     },
-    get(id) {
+    get(id, owner) {
       const e = live.get(id);
-      if (!e || now() - e.touched > ttlMs) return null;
+      if (!e || e.owner !== owner || now() - e.touched > ttlMs) return null;
       e.touched = now();
+      live.delete(id); live.set(id, e);
       return e.session;
     },
-    async delete(id) {
+    async delete(id, owner) {
       const e = live.get(id);
-      if (!e) return false;
-      live.delete(id); await e.session.close().catch(() => {});
+      if (!e || e.owner !== owner) return false;
+      await drop(id);
       return true;
     },
     size: () => live.size,
+    sizeFor: (owner) => [...live.values()].filter((e) => e.owner === owner).length,
   };
 }

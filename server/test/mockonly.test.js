@@ -32,7 +32,7 @@ test('MOCK_ONLY accepts 1 and true only', () => {
 
 test('mock-only: URL / token / credential carriers get 403 mock_only; the same requests work with it off', async () => {
   const carriers = [
-    ['/api/run-victim', { task: 'price of ACME', mode: 'pinned', url: 'https://real.example.net/mcp' }],
+    ['/api/run-victim', { task: 'price of ACME', mode: 'pinned', url: 'https://real.hostile.example/mcp' }],
     ['/api/run-victim', { task: 'price of ACME', mode: 'pinned', nested: { access_token: 'x' } }],
     ['/api/mcp-session/new', { trusted: true, upstream: 'http://gw' }],
   ];

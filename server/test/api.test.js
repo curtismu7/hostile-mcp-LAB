@@ -9,8 +9,15 @@ async function withServer(fn, opts) {
   const health = createHealth();
   const server = await startHttpServer(0, '127.0.0.1', { health, sessions: createSessions(), ...opts });
   const base = `http://127.0.0.1:${server.port}`;
-  const post = (path, body, init = {}) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body), ...init });
-  try { await fn({ base, post, get: (p) => fetch(base + p) }); } finally { health.stop(); await server.close(); }
+  let cookie = ''; // one browser: carries the server-minted visitor cookie
+  const send = async (path, init = {}) => {
+    const r = await fetch(base + path, { ...init, headers: { ...(cookie ? { cookie } : {}), ...init.headers } });
+    const sc = r.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    return r;
+  };
+  const post = (path, body, init = {}) => send(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body), ...init });
+  try { await fn({ base, post, get: (p) => send(p), del: (p) => send(p, { method: 'DELETE' }) }); } finally { health.stop(); await server.close(); }
 }
 
 test('GET /api/catalog lists the ten poisons with an honest scanner and pinning answer each', () => withServer(async ({ get }) => {
@@ -121,7 +128,7 @@ test('a huge body is refused with 413 before it is parsed', () => withServer(asy
   assert.equal((await r.json()).error, 'payload_too_large');
 }));
 
-test('the rug-pull flow over the API: new session, list #1, approve, list #2 is flagged', () => withServer(async ({ post, base }) => {
+test('the rug-pull flow over the API: new session, list #1, approve, list #2 is flagged', () => withServer(async ({ post, del }) => {
   const made = await post('/api/mcp-session/new', {});
   assert.equal(made.status, 201);
   const { sessionId, pins } = await made.json();
@@ -148,7 +155,7 @@ test('the rug-pull flow over the API: new session, list #1, approve, list #2 is 
   const other = (await (await post('/api/mcp-session/new', { trusted: false })).json()).sessionId;
   assert.equal((await (await post(`/api/mcp-session/${other}/list`, {})).json()).listNumber, 1);
 
-  assert.equal((await fetch(`${base}/api/mcp-session/${sessionId}`, { method: 'DELETE' })).status, 204);
+  assert.equal((await del(`/api/mcp-session/${sessionId}`)).status, 204);
   assert.equal((await post(`/api/mcp-session/${sessionId}/list`, {})).status, 404);
 }));
 
@@ -167,14 +174,14 @@ test('sessions are capped and expire', async () => {
   await sessions.create();
   await sessions.create();
   assert.equal(sessions.size(), 2);
-  assert.equal(sessions.get(a.id), null, 'oldest evicted');
+  assert.equal(sessions.get(a.id, 'anonymous'), null, 'oldest evicted');
   const b = await sessions.create();
-  assert.equal(sessions.get(b.id)?.id, b.id);
+  assert.equal(sessions.get(b.id, 'anonymous')?.id, b.id);
   t = 5000;
-  assert.equal(sessions.get(b.id), null, 'expired after the time-to-live');
+  assert.equal(sessions.get(b.id, 'anonymous'), null, 'expired after the time-to-live');
   const c = await sessions.create();
   assert.equal(sessions.size(), 1, 'expired sessions are swept on the next create');
-  assert.equal(sessions.get(c.id)?.id, c.id);
+  assert.equal(sessions.get(c.id, 'anonymous')?.id, c.id);
 });
 
 test('the MCP endpoints still answer next to the API', () => withServer(async ({ get }) => {
