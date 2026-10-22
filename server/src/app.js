@@ -10,6 +10,8 @@ import { catalog } from './catalog.js';
 import { createVisitorStates, mockOnly, mockOnlyGuard } from './mockonly.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
+import { createUiVisitors } from './uivisitor.js';
+import { trustHops } from './source.js';
 import { runScenario } from './scenario.js';
 import { CATCHES, LIMITS, reveal } from './pinning.js';
 import { VICTIM_RULES } from './victim.js';
@@ -22,8 +24,9 @@ const MODES = ['ungoverned', 'pinned'];
 const STAGES = ['first', 'later'];
 const MAX_TASK = 300;
 
-export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions() } = {}) {
+export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions(), visitors = createUiVisitors({ trustProxy: trustHops(env) }) } = {}) {
   const mock = mockOnly(env);
+  const hops = trustHops(env);
   const app = express();
   app.disable('x-powered-by');
   app.use(hostGuard(env));
@@ -49,13 +52,16 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   }));
 
   api.post('/mcp-session/new', wrap(async (req, res) => {
+    const v = visitors.identify(req, res);
+    if (v.throttled || !visitors.allowNew(v.id)) return res.status(429).json({ error: 'rate_limited', message: 'Too many sessions; slow down.' });
     const trusted = req.body?.trusted === undefined ? true : req.body.trusted;
     if (typeof trusted !== 'boolean') return bad(res, 'trusted must be a boolean');
-    const session = await sessions.create({ trusted });
+    const session = await sessions.create({ trusted, owner: v.id });
     res.status(201).json({ sessionId: session.id, trusted, pins: session.pinned.pins() });
   }));
   const withSession = (fn) => wrap(async (req, res) => {
-    const session = sessions.get(req.params.id);
+    const v = visitors.identify(req, res);
+    const session = v.id ? sessions.get(req.params.id, v.id) : null;
     if (!session) return bad(res, 'no such session (it may have expired)', 404);
     await fn(session, req, res);
   });
@@ -72,7 +78,8 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
     res.json({ ...result, listNumber: session.lastList.listNumber, note: 'Approval records the list as it is. It does not read the content.' });
   }));
   api.delete('/mcp-session/:id', wrap(async (req, res) => {
-    if (!(await sessions.delete(req.params.id))) return bad(res, 'no such session', 404);
+    const v = visitors.identify(req, res);
+    if (!v.id || !(await sessions.delete(req.params.id, v.id))) return bad(res, 'no such session', 404);
     res.status(204).end();
   }));
   api.use((_req, res) => bad(res, 'no such endpoint', 404));
@@ -86,7 +93,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
 
   // Mock-only: refuse URL/credential carriers on the MCP endpoints too (their body is parsed inside the router).
   if (mock) app.use((req, res, next) => (req.headers.authorization ? res.status(403).json({ error: 'mock_only', message: 'Disabled in the hosted mock.' }) : next()));
-  app.use(createMcpRouter(mock ? { stateFor: createVisitorStates() } : undefined));
+  app.use(createMcpRouter(mock ? { stateFor: createVisitorStates({ trustProxy: hops }) } : undefined));
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
     app.use(express.static(WEB_DIST));
