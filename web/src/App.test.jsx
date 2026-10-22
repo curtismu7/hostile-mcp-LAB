@@ -41,3 +41,14 @@ test("the presenter toggle and the theme button set their flags on the document"
   await userEvent.click(screen.getByRole("button", { name: /Theme/ }));
   expect(document.documentElement.dataset.theme).toBe("dark");
 });
+
+test("the hosted-mock banner shows only when /api/health reports mock-only", async () => {
+  vi.stubGlobal("fetch", vi.fn(mockFetch({ "GET /api/catalog": catalog, "GET /api/health": { mode: "mock-only" } })));
+  render(<App />);
+  expect(await screen.findByTestId("mock-banner")).toHaveTextContent("Hosted mock: sample data only, nothing leaves this server");
+  cleanup();
+  vi.stubGlobal("fetch", vi.fn(mockFetch({ "GET /api/catalog": catalog, "GET /api/health": { state: "ready" } })));
+  render(<App />);
+  await screen.findByTestId("banner");
+  expect(screen.queryByTestId("mock-banner")).toBeNull();
+});
