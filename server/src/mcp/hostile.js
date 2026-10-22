@@ -3,7 +3,7 @@
 // defends: the demonstration is that the poison arrives unfiltered.
 //
 // Transports (both live at once):
-//   POST /            Streamable HTTP (stateless: one server per request)
+//   POST /            Streamable HTTP (one server per request; list state comes from stateFor)
 //   POST /mcp         same, the path a gateway forwards to
 //   GET  /sse         SSE stream; POST /messages?sessionId=...
 //   GET  /health      liveness
@@ -81,16 +81,16 @@ export function buildServer(state = sharedState) {
   return server;
 }
 
-export function createMcpRouter() {
+export function createMcpRouter({ stateFor = () => sharedState } = {}) {
   const router = express.Router();
   router.use(express.json());
 
   router.get('/health', (_req, res) => res.json({ ok: true, tools: TOOLS.length }));
 
-  // Streamable HTTP: one stateless server per request. /mcp is the canonical path a gateway forwards to;
+  // Streamable HTTP: one server per request (stateless transport); its list state comes from stateFor. /mcp is the canonical path a gateway forwards to;
   // / stays as the original alias for direct clients.
   const streamablePost = async (req, res) => {
-    const server = buildServer();
+    const server = buildServer(stateFor(req, res));
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => { transport.close(); server.close(); });
     await server.connect(transport);
@@ -105,13 +105,19 @@ export function createMcpRouter() {
     const transport = new SSEServerTransport('/messages', res);
     sseTransports.set(transport.sessionId, transport);
     res.on('close', () => sseTransports.delete(transport.sessionId));
-    const server = buildServer();
+    const server = buildServer(stateFor(_req, res));
     await server.connect(transport); // calls start(): writes the `endpoint` event
   });
   router.post('/messages', async (req, res) => {
     const transport = sseTransports.get(req.query.sessionId);
     if (!transport) { res.writeHead(400).end('no SSE session for that sessionId'); return; }
     await transport.handlePostMessage(req, res, req.body);
+  });
+  // Final handler: never leak a stack or server paths (body-parser errors, e.g. 413, land here).
+  router.use((err, _req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 ? err.status : 500;
+    res.status(status).json({ error: status === 413 ? 'payload_too_large' : status === 500 ? 'server_error' : 'bad_request' });
   });
   return router;
 }

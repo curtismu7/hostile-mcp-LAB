@@ -15,3 +15,4 @@ export const newSession = () => post("/api/mcp-session/new", { trusted: true });
 export const listTools = (id) => post(`/api/mcp-session/${id}/list`);
 export const approve = (id) => post(`/api/mcp-session/${id}/approve`);
 export const endSession = (id) => request(`/api/mcp-session/${id}`, { method: "DELETE" }).catch(() => {});
+export const getHealth = () => request("/api/health");
