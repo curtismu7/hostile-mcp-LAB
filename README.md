@@ -52,18 +52,23 @@ Node 22, non-root, `NODE_ENV=production`. The server binds `0.0.0.0` inside the 
 
 ## Hosting the mock
 
-A hosted copy needs three settings, all explicit. The defaults stay loopback-only and none of this switches on by itself.
+The env switch is `MOCK_ONLY` (the family convention); it is the same thing the SE rulebook calls `MODE=mock`. Set `MOCK_ONLY=1` where the rulebook says `MODE=mock`.
+
+A hosted copy needs these settings, all explicit. The defaults stay loopback-only and none of this switches on by itself.
 
 ```bash
 MOCK_ONLY=1                              # refuse URL/credential carriers; per-visitor rug-pull state; mock banner
 HOSTILE_BIND=0.0.0.0                     # the opt-in to listen off loopback (the Docker image already sets it)
-HOSTILE_ALLOWED_HOSTS=mock.example.net   # comma list of Host names (no ports); any other Host gets 421
+HOSTILE_ALLOWED_HOSTS=mock.hostile.example   # comma list of Host names (no ports); any other Host gets 421
+HOSTILE_TRUST_PROXY=1                    # optional: number of trusted proxy hops in front (default 0 = off), see below
 PORT=4701
 ```
 
-- Without `HOSTILE_BIND` the server refuses a non-loopback address. Without `HOSTILE_ALLOWED_HOSTS` there is no Host check (the local default); set it on any hosted copy to stop DNS rebinding.
-- Readiness probe: `GET /api/health` returns 200 with `"state":"ready"` (and `"mode":"mock-only"` when on). The probe is subject to the Host check, so send the public Host name (`httpGet.httpHeaders`), or add the probe's host to `HOSTILE_ALLOWED_HOSTS`. The compose health check calls `127.0.0.1`, so add that name if you set the list there.
-- Visitor isolation: each MCP client gets its own rug-pull counter from a session id the server mints on `initialize` (`Mcp-Session-Id`, and an `HttpOnly; SameSite=Lax` cookie, `Secure` behind `X-Forwarded-Proto: https`). Remote address is never used. A request with no id, or one the server did not issue, sees a fresh state. State is held in memory (500 visitors, 30 minute TTL, oldest evicted), so run one replica or use session affinity.
+- Without `HOSTILE_BIND` the server refuses a non-loopback address. `MOCK_ONLY` on a non-loopback bind refuses to start without `HOSTILE_ALLOWED_HOSTS`, so a hosted mock never answers an arbitrary Host (DNS rebinding). On loopback, with no list, there is no Host check (the local default).
+- Readiness probe: `GET /api/health` returns 200 with `"state":"ready"` (and `"mode":"mock-only"` when on). The probe is subject to the Host check: the kubelet probe must set a `Host` header to an allowed name via `httpGet.httpHeaders`, or the probe's own host must be added to `HOSTILE_ALLOWED_HOSTS`. The compose health check calls `127.0.0.1`, so add that name if you set the list there.
+- Visitor isolation: each MCP client gets its own rug-pull counter from a session id the server mints on `initialize` (`Mcp-Session-Id`, and an `HttpOnly; SameSite=Lax` cookie, `Secure` behind `X-Forwarded-Proto: https`). The connection address is never a state key. A request with no id, or one the server did not issue, sees a fresh state. State is held in memory (5000 visitors by default, 30 minute TTL, least recently used evicted), so run one replica or use session affinity.
+- Web UI sessions (the rug-pull page, `/api/mcp-session/*`) belong to the visitor: the server mints an `hm_ui` HttpOnly cookie, a session id works only with the cookie that created it, each visitor holds at most 10 sessions and may create 30 a minute, and the global table holds 5000 (least recently used evicted). A client-invented cookie is ignored.
+- Throttle source and the ingress: minting (both the MCP session id and the `hm_ui` cookie) is rate-limited per source. By default the source is the TCP connection, which behind an ingress is the ingress pod, so every visitor would share one bucket. Set `HOSTILE_TRUST_PROXY=N`, where N is the number of trusted proxy hops in front of the server (1 for a single ingress), and the source becomes the Nth entry from the right of `X-Forwarded-For`; entries a client prepends are ignored. Leave it unset when nothing trusted sits in front, since the header is then client-controlled.
 - Do not bake a `.env` into an image. `.dockerignore` excludes it; keep it that way and pass settings as environment variables at run time.
 
 ## Demo shelf

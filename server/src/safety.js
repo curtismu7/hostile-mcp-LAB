@@ -2,6 +2,7 @@
 //  1. Bind loopback only, unless HOSTILE_BIND is set.
 //  2. Every host named in any payload is a reserved, non-resolvable name (RFC 2606 / RFC 6761): the .invalid TLD, the
 //     .example TLD, or the apex of example.com / example.net / example.org (never a subdomain). No real host, no IP address.
+import { mockOnly } from './mockonly.js';
 import { POISON_PROMPTS, POISONS, POISON_RESOURCES } from './poisons.js';
 import { ACTION_TOOLS, READ_TICKET, callResultText, rugPullTool } from './mcp/tools.js';
 
@@ -13,7 +14,11 @@ export function isLoopbackHost(host) {
 export function bindHost(env = process.env) { return env.HOSTILE_BIND || '127.0.0.1'; }
 
 export function assertBindAllowed(host, env = process.env) {
-  if (isLoopbackHost(host) || env.HOSTILE_BIND) return host;
+  if (isLoopbackHost(host) || env.HOSTILE_BIND) {
+    // Fail closed: a hosted mock must name the Host values it answers, or it would answer any Host (DNS rebinding).
+    if (!isLoopbackHost(host) && mockOnly(env) && !allowedHosts(env)) throw new Error(`refusing to start: MOCK_ONLY on non-loopback bind ${host} requires HOSTILE_ALLOWED_HOSTS`);
+    return host;
+  }
   throw new Error(`refusing to bind ${host}: this server serves hostile payloads and listens on loopback only. Set HOSTILE_BIND to opt in.`);
 }
 
