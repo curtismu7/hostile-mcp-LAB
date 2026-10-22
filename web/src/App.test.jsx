@@ -45,7 +45,7 @@ test("the presenter toggle and the theme button set their flags on the document"
 test("the hosted-mock banner shows only when /api/health reports mock-only", async () => {
   vi.stubGlobal("fetch", vi.fn(mockFetch({ "GET /api/catalog": catalog, "GET /api/health": { mode: "mock-only" } })));
   render(<App />);
-  expect(await screen.findByTestId("mock-banner")).toHaveTextContent("Hosted mock: sample data only, nothing leaves this server");
+  expect(await screen.findByTestId("mock-banner")).toHaveTextContent("Hosted, simulated: sample data only, nothing leaves this server");
   cleanup();
   vi.stubGlobal("fetch", vi.fn(mockFetch({ "GET /api/catalog": catalog, "GET /api/health": { state: "ready" } })));
   render(<App />);

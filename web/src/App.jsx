@@ -50,7 +50,7 @@ export default function App() {
       <div className="banner" role="note" data-testid="banner">
         <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
       </div>
-      {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted mock: sample data only, nothing leaves this server</div>}
+      {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
       <header className="top">
         <h1>Hostile MCP</h1>
         <nav aria-label="Pages">
