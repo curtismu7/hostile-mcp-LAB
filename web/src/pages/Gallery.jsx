@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getCatalog } from "../lib/api.js";
 import StoryPanel from "../story/StoryPanel.jsx";
+import Terms from "../components/Terms.jsx";
 
 // Poison catalog grouped by category. The three badges come straight from the catalog data (scanner / pinning answers).
 export const CATEGORIES = [
@@ -46,6 +47,7 @@ export default function Gallery({ present }) {
     <>
       <StoryPanel mode="gallery" present={present} />
       <h2>Poison gallery</h2>
+      <Terms />
       <p className="lede">Every poison the server can serve, grouped by where it hides. The badges say which control would catch it, taken from the catalog data. Nothing here is executed.</p>
       {error && <p role="alert" className="alert">Could not load the catalog: {error}</p>}
       {!catalog && !error && <p className="muted">Loading the catalog...</p>}
