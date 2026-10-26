@@ -109,7 +109,7 @@ export default function Run({ present }) {
     <>
       <StoryPanel mode="run" present={present} />
       <h2>Run the victim</h2>
-      <p className="lede">Pick a harmless task. The offline victim (no model) reads the tool list the way a trusting agent does, once through an ungoverned client and once through a pinned client.</p>
+      <p className="lede">Same poisoned server, two clients. Pick a harmless task. The <abbr title="The assistant that reads the tool list and plans calls from it. Offline here, with no model.">victim</abbr> reads the tool list once through an <abbr title="A client that takes whatever the server sends, with no check.">ungoverned client</abbr>, which trusts it, and once through a <abbr title="A client that fingerprints each approved tool and refuses any tool whose fingerprint later changes.">pinned client</abbr>, which checks it first.</p>
       <form className="card controls" onSubmit={(e) => { e.preventDefault(); go(); }}>
         <label>Task
           <select value={task} onChange={(e) => setSel((s) => ({ ...s, task: Number(e.target.value) }))}>

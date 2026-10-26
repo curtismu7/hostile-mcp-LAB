@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { VERTICALS, storyForMode, verticalById } from "./stories.js";
 import { fillAll } from "./fill.js";
+import { TermsNote } from "../components/Terms.jsx";
 
 // Adapted from the ID-JAG kit StoryPanel: the talk track for the page, re-skinned by the chosen vertical, with the
 // Allowed/Blocked switch. Differences: no customer context (the vertical is the viewer's own choice) and presenter
@@ -49,6 +50,7 @@ export default function StoryPanel({ mode, present = false }) {
               <button type="button" aria-pressed={blocked} onClick={() => pickPath("blocked")}>Blocked</button>
             </div>
           </div>
+          <TermsNote words={["ungoverned client", "pinned client"]} />
           <dl className="story__summary">
             <dt>Goal</dt><dd>{story.goal}</dd>
             <dt>Obstacle</dt><dd>{story.obstacle}</dd>
