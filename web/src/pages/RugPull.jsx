@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { approve, endSession, listTools, newSession, runVictim } from "../lib/api.js";
 import { Revealed, Untrusted } from "../lib/Untrusted.jsx";
 import StoryPanel from "../story/StoryPanel.jsx";
+import { Term, TermsNote } from "../components/Terms.jsx";
 import { outcome } from "./Run.jsx";
 
 // Story S05 as a guided flow: 1 approve list #1, 2 come back later (list #2), 3 compare. Each step is a real call
@@ -58,6 +59,7 @@ export default function RugPull({ present }) {
       <StoryPanel mode="rugpull" present={present} />
       <h2>Rug-pull: a tool changed overnight</h2>
       <p className="lede">Three steps against the real hostile server. It answers list #1 with a clean <code>{TOOL}</code> and every later list with a poisoned one.</p>
+      <TermsNote words={["rug-pull", "pinned client", "ungoverned client", "hash"]} />
       {error && <p role="alert" className="alert">Something went wrong: {error}</p>}
       <ol className="flow">
         <li className="card" aria-current={step === 0 ? "step" : undefined}>
@@ -99,12 +101,12 @@ export default function RugPull({ present }) {
               </dl>
               <div className="cols">
                 <div className="card col" data-testid="rp-pinned">
-                  <h4>Pinned client</h4>
+                  <h4><Term word="pinned client">Pinned client</Term></h4>
                   <p className={`verdict ${outcome(pinned, ungoverned).level}`} role="status">REFUSED: {verdict.verdict}</p>
                   <p>{outcome(pinned, ungoverned).label}. Planned calls: {pinned.victim.calls.length ? pinned.victim.calls.map((c) => c.tool).join(", ") : "none"}.</p>
                 </div>
                 <div className="card col" data-testid="rp-ungoverned">
-                  <h4>Ungoverned client</h4>
+                  <h4><Term word="ungoverned client">Ungoverned client</Term></h4>
                   <p className={`verdict ${outcome(ungoverned, pinned).level}`} role="status">ACCEPTED: {outcome(ungoverned, pinned).label}</p>
                   <p>Planned calls: {ungoverned.victim.calls.map((c) => c.tool).join(", ")}. Nothing was executed.</p>
                 </div>
