@@ -8,15 +8,15 @@ import StoryPanel from "../story/StoryPanel.jsx";
 // words what the picture shows, so the diagram is never the only carrier.
 const START = [
   { id: "server", position: { x: 0, y: 110 }, data: { title: "Hostile MCP server", sub: "Serves the payloads. Never scores or blocks." } },
-  { id: "client", position: { x: 280, y: 110 }, data: { title: "Client", sub: "Receives tools/list" } },
-  { id: "pin", position: { x: 560, y: 110 }, data: { title: "Pin check", sub: "Hash name + description + schema, compare with approval" } },
+  { id: "client", position: { x: 280, y: 110 }, data: { title: "Client", sub: "Receives the tool list. Ungoverned: passes it on. Pinned: checks it first." } },
+  { id: "pin", position: { x: 560, y: 110 }, data: { title: "Pin check", sub: "Fingerprints each tool (SHA-256 of name, description, schema) and compares it with the fingerprint recorded at approval." } },
   { id: "withheld", position: { x: 560, y: -80 }, data: { title: "Withheld", sub: "Changed or shadowed tool: not shown to the victim" } },
   { id: "victim", position: { x: 840, y: 110 }, data: { title: "Offline victim", sub: "Reads the tool list, plans calls. No model." } },
   { id: "call", position: { x: 1120, y: 110 }, data: { title: "Planned call", sub: "Inert stub. Never executed." } },
 ];
 const EDGES = [
   { id: "e1", source: "server", target: "client", sourceHandle: "r", targetHandle: "l", label: "1 tools/list" },
-  { id: "e2", source: "client", target: "pin", sourceHandle: "r", targetHandle: "l", label: "2 check (pinned only)" },
+  { id: "e2", source: "client", target: "pin", sourceHandle: "r", targetHandle: "l", label: "2 fingerprint check (pinned only)" },
   { id: "e3", source: "pin", target: "victim", sourceHandle: "r", targetHandle: "l", label: "3 tools that passed" },
   { id: "e3w", source: "pin", target: "withheld", sourceHandle: "t", targetHandle: "b", label: "3 changed: withheld" },
   { id: "e4", source: "victim", target: "call", sourceHandle: "r", targetHandle: "l", label: "4 plans a call" },
@@ -91,7 +91,7 @@ export default function Diagram({ present, theme = "system" }) {
   return (
     <>
       <h2>How the pin sits in the path</h2>
-      <p className="lede">Nothing in MCP inspects tool metadata, so a defence has to sit where the metadata is consumed. Drag any box. Simulate runs the rug-pull through the chosen client.</p>
+      <p className="lede">MCP does not check tool descriptions for you, so a defence has to sit between the server and the assistant. The <abbr title="Records a fingerprint of each approved tool and refuses any tool whose fingerprint later changes.">pin check</abbr> is that defence. Drag any box. Simulate runs the rug-pull through the chosen client. Hover a dotted term for its meaning.</p>
       <div className="card controls">
         <label>Client
           <select value={scenario} onChange={(e) => pickScenario(e.target.value)}>
