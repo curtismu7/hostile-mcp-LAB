@@ -38,3 +38,12 @@ test("the panel hides, stays open in presenter mode, and a page with no story re
   rerender(<StoryPanel mode="limits" />);
   expect(container).toBeEmptyDOMElement();
 });
+
+test("the story explains both clients in plain words before it uses them", () => {
+  render(<StoryPanel mode="rugpull" />);
+  const note = screen.getByLabelText("Words used on this page");
+  expect(note).toHaveTextContent("Ungoverned client");
+  expect(note).toHaveTextContent("takes whatever the server sends");
+  expect(note).toHaveTextContent("Pinned client");
+  expect(note).toHaveTextContent("fingerprints each tool");
+});

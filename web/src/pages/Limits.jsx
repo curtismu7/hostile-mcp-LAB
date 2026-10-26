@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getCatalog } from "../lib/api.js";
 import { PoisonCard } from "./Gallery.jsx";
+import { TermsNote } from "../components/Terms.jsx";
 
 // Which catalog rows prove each limit. A limit with no row says so rather than inventing evidence.
 export const PROOF = {
@@ -18,6 +19,7 @@ export default function Limits() {
     <>
       <h2>What pinning does not catch</h2>
       <p className="lede">Pinning notices change. It does not judge content. A scanner or a person must vet the first list, and runtime controls must limit what a poisoned tool can do.</p>
+      <TermsNote words={["pin", "pinned client", "ungoverned client"]} />
       {error && <p role="alert" className="alert">Could not load the catalog: {error}</p>}
       {!catalog && !error && <p className="muted">Loading the catalog...</p>}
       {catalog && (

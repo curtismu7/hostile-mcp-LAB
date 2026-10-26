@@ -32,3 +32,20 @@ export default function Terms() {
     </section>
   );
 }
+
+// A short "in plain words" note with only the definitions a page needs.
+export function TermsNote({ words }) {
+  return (
+    <aside className="card terms-note" aria-label="Words used on this page">
+      <p><strong>In plain words</strong></p>
+      <dl>
+        {words.map((word) => (
+          <React.Fragment key={word}>
+            <dt>{word.charAt(0).toUpperCase() + word.slice(1)}</dt>
+            <dd>{DEFINITIONS[word]}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    </aside>
+  );
+}
