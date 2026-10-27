@@ -8,6 +8,10 @@ export const DEFINITIONS = {
   "hash": "A SHA-256 fingerprint of a tool's name, description and input schema. Any change to those fields changes the fingerprint.",
   "withheld": "Not passed to the assistant. The client keeps the tool out and shows what changed.",
   "victim": "The assistant that reads the tool list and plans calls from it. In this demo it is offline and has no model.",
+  "json-rpc": "The message format MCP uses: a small JSON object with a method name, parameters and an id, answered by another object with the same id.",
+  "tools/list": "The MCP request that asks a server which tools it offers. The answer lists each tool's name, description and input schema.",
+  "tools/call": "The MCP request that asks a server to run one tool with the given arguments.",
+  "input schema": "The description of the arguments a tool accepts, as a JSON Schema.",
   "rug-pull": "A server that behaves well when approved, then changes a tool's description later so it does something harmful.",
 };
 
