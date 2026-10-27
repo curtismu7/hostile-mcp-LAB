@@ -134,3 +134,12 @@ th, td { padding: 0.5rem; border-bottom: 1px solid var(--border); text-align: le
 .skip:focus { top: 0.5rem; }
 main:focus { outline: none; }
 .chip { display: inline-block; padding: 0 0.3em; border: 1px solid var(--deny); border-radius: 4px; background: var(--deny-wash); color: var(--deny); font: 0.8em var(--mono); }
+
+/* On the wire panel */
+.wire__pre { margin: 0; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); overflow: auto; max-height: 22rem; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wire .seg { flex-wrap: wrap; margin: 0.4rem 0; }
+.wire__empty, .wire__notice { padding: 0.5rem 0.75rem; border-left: 4px solid var(--accent); background: var(--bg); border-radius: 0 6px 6px 0; }
+.wire__table .is-changed td, .wire__table .is-changed th { background: var(--hold-wash); }
+.wire__table td code { font-size: 0.75rem; }
+.wire__clients { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.75rem; font-size: 0.9rem; }
+@media (max-width: 40rem) { .wire__clients { grid-template-columns: 1fr; } }

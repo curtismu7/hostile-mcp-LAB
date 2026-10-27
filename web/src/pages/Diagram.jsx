@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, applyNodeChanges, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import WireDetail from "../components/WireDetail.jsx";
 import StoryPanel from "../story/StoryPanel.jsx";
 
 // MCP server -> client -> pin check -> victim -> tool call. Boxes are draggable; Simulate walks one run of the
@@ -41,6 +42,7 @@ export const SCENARIOS = {
     ],
   },
 };
+const WIRE_IDS = ["e1", "e2", "e3", "e3w", "e4", "e5"];
 const SPEEDS = [["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]];
 const BASE_MS = 1600;
 
@@ -65,7 +67,9 @@ export default function Diagram({ present, theme = "system" }) {
   const [speed, setSpeed] = useState("1");
   const [step, setStep] = useState(-1); // -1 = idle
   const [running, setRunning] = useState(false);
+  const [wireId, setWireId] = useState("e1");
   const steps = SCENARIOS[scenario].steps;
+  const cur = step >= 0 ? steps[step] : null;
 
   useEffect(() => {
     if (!running) return undefined;
@@ -74,12 +78,14 @@ export default function Diagram({ present, theme = "system" }) {
     return () => clearTimeout(t);
   }, [running, step, steps.length, speed]);
 
+  // The wire panel follows the simulation; clicking a connection or a panel button picks a step by hand.
+  useEffect(() => { if (cur) setWireId(cur.edges[0]); }, [cur]);
+
   const simulate = () => { setStep(0); setRunning(true); };
   const reset = () => { setRunning(false); setStep(-1); setMoved(START); };
   const pickScenario = (s) => { setScenario(s); setRunning(false); setStep(-1); };
   const onNodesChange = useCallback((changes) => setMoved((n) => applyNodeChanges(changes, n)), []);
 
-  const cur = step >= 0 ? steps[step] : null;
   const nodes = useMemo(() => moved.map((n) => ({ ...n, type: "box", data: { ...n.data, on: !!cur?.nodes.includes(n.id), dim: !!cur && !cur.nodes.includes(n.id) } })), [moved, cur]);
   const edges = useMemo(() => EDGES.map(({ dashed, ...e }) => ({
     ...e,
@@ -107,7 +113,7 @@ export default function Diagram({ present, theme = "system" }) {
         <button type="button" className="btn" onClick={reset}>Reset</button>
       </div>
       <div className="flow-wrap" role="group" aria-label="Diagram of the MCP server, client, pin check, victim and planned call. Boxes can be dragged.">
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} colorMode={theme}
+        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgeClick={(_, e) => WIRE_IDS.includes(e.id) && setWireId(e.id)} colorMode={theme}
           fitView fitViewOptions={{ padding: 0.12 }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2}>
           <Background />
           <Controls showInteractive={false} />
@@ -116,6 +122,7 @@ export default function Diagram({ present, theme = "system" }) {
       <p className="caption" role="status" aria-live="polite" data-testid="caption">
         {cur ? `Step ${step + 1} of ${steps.length}: ${cur.text}` : "Press Simulate to walk one run through the diagram."}
       </p>
+      <WireDetail stepId={wireId} onSelect={setWireId} />
       <StoryPanel mode="diagram" present={present} />
     </>
   );
