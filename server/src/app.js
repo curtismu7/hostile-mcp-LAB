@@ -13,6 +13,9 @@ import { createSessions } from './session.js';
 import { createUiVisitors } from './uivisitor.js';
 import { trustHops } from './source.js';
 import { runScenario } from './scenario.js';
+import { PolicyError, gatewayConfig, parseRequest, runGateway } from './gateway-scenario.js';
+import { hostileCatalog } from './gateway-fixtures.js';
+import { TAGS } from './gateway.js';
 import { CATCHES, LIMITS, reveal } from './pinning.js';
 import { VICTIM_RULES } from './victim.js';
 
@@ -49,6 +52,15 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
     if (!MODES.includes(mode)) return bad(res, `mode must be one of ${MODES.join(', ')}`);
     if (!STAGES.includes(stage)) return bad(res, `stage must be one of ${STAGES.join(', ')}`);
     res.json(await runScenario({ task: task.trim(), mode, stage }));
+  }));
+
+  // Entitlement-aware discovery and the aggregate policy cap, simulated in this process. A Ping release claim (2026-11-02),
+  // UNVERIFIED on our tenant; there is no live path. The body is validated field by field and never echoed.
+  api.get('/gateway/config', (_req, res) => res.json({ ...gatewayConfig(hostileCatalog(2)), tags: TAGS, status: 'Ping release claim (2026-11-02), UNVERIFIED on our tenant', mode: 'offline simulation, no live path' }));
+  api.post('/gateway/run', wrap(async (req, res) => {
+    let request;
+    try { request = parseRequest(req.body); } catch (e) { if (e instanceof PolicyError) return bad(res, e.message); throw e; }
+    try { res.json(await runGateway(request)); } catch (e) { if (e instanceof PolicyError) return bad(res, e.message); throw e; }
   }));
 
   api.post('/mcp-session/new', wrap(async (req, res) => {
