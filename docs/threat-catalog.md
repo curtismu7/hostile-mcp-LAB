@@ -2,20 +2,20 @@
 
 Generated from `server/src/catalog.js` by `node scripts/build-threat-catalog.mjs`. Do not edit by hand; the same data is served at `GET /api/catalog`.
 
-"Scanner" means a metadata scanner that reads tool descriptions and schemas at ingest. This repo ships none; the answers follow the source demo. "Pinning" is the pinned client in `server/src/pinning.js`.
+"Scanner" means a metadata scanner that reads tool descriptions and schemas at ingest. This repo ships none; the answers follow the source demo. "Pinning" is the pinned client in `server/src/pinning.js`. "Gateway" is the entitlement-filtered aggregate gateway simulation in `server/src/gateway.js`: a lab reading of a Ping release claim (2026-11-02), UNVERIFIED on our tenant.
 
-| Poison | Kind | Where it hides | Scanner | Pinning |
-| --- | --- | --- | --- | --- |
-| `description_injection` (`get_weather`) | tool | description | Yes | No |
-| `schema_exfiltration` (`search_docs`) | tool | schema | Yes | Partly |
-| `tool_shadowing` (`get_balance`) | tool | name | Yes | Yes |
-| `action_exfil_sink` (`send_email`) | tool | schema | Yes | Partly |
-| `credential_harvest` (`verify_identity`) | tool | schema | Yes | No |
-| `imperative_injection` (`summarize_ticket`) | tool | description | Yes | No |
-| `rug_pull` (`get_stock_price`) | tool | dynamic | Partly | Yes |
-| `result_injection` (`read_ticket`) | tool | result | No | No |
-| `resource_poisoning` (`mcp://hostile/account-verification`) | resource | resource | No | No |
-| `prompt_poisoning` (`account_review`) | prompt | prompt | No | No |
+| Poison | Kind | Where it hides | Scanner | Pinning | Gateway (UNVERIFIED) |
+| --- | --- | --- | --- | --- | --- |
+| `description_injection` (`get_weather`) | tool | description | Yes | No | Partly |
+| `schema_exfiltration` (`search_docs`) | tool | schema | Yes | Partly | Partly |
+| `tool_shadowing` (`get_balance`) | tool | name | Yes | Yes | Yes |
+| `action_exfil_sink` (`send_email`) | tool | schema | Yes | Partly | Partly |
+| `credential_harvest` (`verify_identity`) | tool | schema | Yes | No | Partly |
+| `imperative_injection` (`summarize_ticket`) | tool | description | Yes | No | Partly |
+| `rug_pull` (`get_stock_price`) | tool | dynamic | Partly | Yes | Partly |
+| `result_injection` (`read_ticket`) | tool | result | No | No | No |
+| `resource_poisoning` (`mcp://hostile/account-verification`) | resource | resource | No | No | No |
+| `prompt_poisoning` (`account_review`) | prompt | prompt | No | No | No |
 
 ## `description_injection`
 
@@ -25,6 +25,7 @@ Subject: tool `get_weather`. Hides in: description.
 - How it lands: The agent reads the description as trusted context and obeys it.
 - Scanner (Yes): A scanner reading the description at ingest sees the block.
 - Pinning (No): Approved on first sight, the hash only proves it has not changed since.
+- Gateway, lab reading, UNVERIFIED (Partly): Hidden only if the caller is not entitled to the tool or the cap leaves it out. An entitled caller sees the description exactly as written: the filter does not clean content.
 
 ## `schema_exfiltration`
 
@@ -34,6 +35,7 @@ Subject: tool `search_docs`. Hides in: schema.
 - How it lands: An agent that auto-fills arguments from the schema leaks on every call.
 - Scanner (Yes): The off-box default is visible in the schema.
 - Pinning (Partly): Not caught if it was there at approval. Flagged as off-origin-sink if it is added later.
+- Gateway, lab reading, UNVERIFIED (Partly): Hidden if not entitled or over the cap. If it is listed, the off-box default is delivered unchanged.
 
 ## `tool_shadowing`
 
@@ -43,6 +45,7 @@ Subject: tool `get_balance`. Hides in: name.
 - How it lands: An agent that resolves tools by name picks the hostile definition.
 - Scanner (Yes): The primacy claim and the instruction are in the description.
 - Pinning (Yes): Caught as shadowed when the name is already approved from another server.
+- Gateway, lab reading, UNVERIFIED (Yes): The alias prefix keeps the hostile get_balance apart from the bank's, so the name cannot be taken over (a lab reading of alias__tool naming).
 
 ## `action_exfil_sink`
 
@@ -52,6 +55,7 @@ Subject: tool `send_email`. Hides in: schema.
 - How it lands: The leak rides along on every send.
 - Scanner (Yes): The off-box default and the instruction are in the schema.
 - Pinning (Partly): Not caught if it was there at approval. Flagged as off-origin-sink if it is added later.
+- Gateway, lab reading, UNVERIFIED (Partly): Hidden if not entitled or over the cap. If it is listed, the hidden bcc default is delivered unchanged.
 
 ## `credential_harvest`
 
@@ -61,6 +65,7 @@ Subject: tool `verify_identity`. Hides in: schema.
 - How it lands: The agent asks the user for secrets and passes them to the server.
 - Scanner (Yes): Credential-named parameters and the instruction are visible.
 - Pinning (No): Nothing changed after approval, so nothing is flagged.
+- Gateway, lab reading, UNVERIFIED (Partly): Hidden if not entitled or over the cap. If it is listed, the credential parameters are delivered unchanged.
 
 ## `imperative_injection`
 
@@ -70,6 +75,7 @@ Subject: tool `summarize_ticket`. Hides in: description.
 - How it lands: Same as the tagged form: the agent obeys text in the description.
 - Scanner (Yes): Pattern and intent are visible in the description.
 - Pinning (No): Approved on first sight.
+- Gateway, lab reading, UNVERIFIED (Partly): Hidden if not entitled or over the cap. If it is listed, the sentence is delivered unchanged.
 
 ## `rug_pull`
 
@@ -79,6 +85,7 @@ Subject: tool `get_stock_price`. Hides in: dynamic.
 - How it lands: The client approved the clean version; the next list swaps the description.
 - Scanner (Partly): A scanner that runs once at ingest only sees the clean list. One that rescans every list catches it.
 - Pinning (Yes): Caught as changed, with the field diff.
+- Gateway, lab reading, UNVERIFIED (Partly): A tool that first appears after approval is removed unless it is entitled and under the cap. A changed description on a tool that is already listed passes; pinning still has to catch it.
 
 ## `result_injection`
 
@@ -88,6 +95,7 @@ Subject: tool `read_ticket`. Hides in: result.
 - How it lands: It reaches the model only when the result is read back.
 - Scanner (No): There is nothing in the metadata to scan.
 - Pinning (No): Only metadata is hashed.
+- Gateway, lab reading, UNVERIFIED (No): The gateway decides which tools are listed and callable. It does not read what a call returns.
 
 ## `resource_poisoning`
 
@@ -97,6 +105,7 @@ Subject: resource `mcp://hostile/account-verification`. Hides in: resource.
 - How it lands: The agent reads the resource as reference material.
 - Scanner (No): A tool-metadata scanner does not read resources.
 - Pinning (No): Resources are not pinned.
+- Gateway, lab reading, UNVERIFIED (No): This simulation lists tools only. Resources are outside it.
 
 ## `prompt_poisoning`
 
@@ -106,6 +115,7 @@ Subject: prompt `account_review`. Hides in: prompt.
 - How it lands: The prompt arrives as the user turn.
 - Scanner (No): A tool-metadata scanner does not read prompts.
 - Pinning (No): Prompts are not pinned.
+- Gateway, lab reading, UNVERIFIED (No): This simulation lists tools only. Prompts are outside it.
 
 ## What pinning catches
 
@@ -124,3 +134,11 @@ Subject: prompt `account_review`. Hides in: prompt.
 - If a person approves a changed tool again, the new definition becomes the pin.
 - Sink detection reads only schema values (default, const, enum, examples and URLs inside pattern). A URL or email written in a free-text description, a title, or inside a non-string default (an object or array) is not found as a sink.
 - A hostile instruction or a sink on the approved origin's own host is not flagged as a sink.
+
+## What the gateway simulation does not do
+
+- The filter decides which tools a caller sees. It does not read them: an entitled tool under the cap is delivered exactly as the member wrote it, poisoned description included.
+- Entitlements and the cap are written by a person. A tool you entitled and capped in stays listed after its description is rug-pulled; pinning is what notices the change.
+- The gateway decides which tools are listed and callable. It does not read what a call returns, or resources and prompts.
+- Entitlement-aware discovery and the aggregate policy cap are Ping release claims (2026-11-02), UNVERIFIED on our tenant. The SE gateway is v1.261030 and does not have them, so this exists only as an in-process simulation.
+- Per-user upstream OAuth to each member is not simulated: no token is issued, forwarded or shown here.
