@@ -38,13 +38,40 @@ test("first load: side by side, with the engine's real counts and the claim labe
   await ready();
   expect(count("gw-direct-count")).toBe(15);
   expect(count("gw-gateway-count")).toBe(4);
-  expect(screen.getByTestId("gw-gateway-count")).toHaveTextContent("11 hidden for this caller");
+  expect(screen.getByTestId("gw-gateway-count")).toHaveTextContent(/^4 tools listed$/);
   expect(screen.getByTestId("gw-direct")).toHaveTextContent("get_balance");
   expect(screen.getAllByText(/Ping release claim \(2026-11-02\), UNVERIFIED on our tenant/).length).toBeGreaterThan(0);
   expect(screen.getByText(/Offline simulation, no live path/)).toBeInTheDocument();
   expect(screen.getByTestId("gw-pin")).toHaveTextContent("changed: hostile__get_stock_price");
   expect(screen.getByTestId("gw-hops")).toHaveTextContent("2 of 6 calls reached a member");
   expect(screen.getByTestId("story-panel")).toHaveTextContent("S36");
+});
+
+test("the hidden list, the counts and the reasons sit in a labelled demo audit pane, and the caller is told only not available", async () => {
+  render(<Gateway />);
+  await ready();
+  const via = within(screen.getByTestId("gw-gateway"));
+  const audit = within(screen.getByTestId("gw-audit"));
+  expect(audit.getByRole("heading", { name: "Demo audit pane" })).toBeInTheDocument();
+  expect(screen.getByTestId("gw-audit")).toHaveTextContent(/administrator's view/);
+  expect(screen.getByTestId("gw-audit-hidden")).toHaveTextContent("11 tools hidden from this caller");
+  expect(screen.getByTestId("gw-audit")).toHaveTextContent("hostile: 2 of 13 offered tools listed");
+  // the caller-facing parts carry neither the hidden count nor the offered counts nor a reason
+  expect(screen.getByTestId("gw-gateway-count").textContent).not.toMatch(/hidden/);
+  expect(screen.getByTestId("gw-member-hostile").textContent).not.toMatch(/\d+ of \d+/);
+  const table = within(screen.getByTestId("gw-attempts"));
+  expect(table.getByRole("columnheader", { name: "The caller is told" })).toBeInTheDocument();
+  const rowOf = (name) => table.getByText(name).closest("tr");
+  expect(rowOf("hostile__create_transfer")).toHaveTextContent("refused: not available");
+  expect(rowOf("hostile__bulk_export")).toHaveTextContent("refused: not available");
+  expect(rowOf("hostile__create_transfer").querySelector("td").textContent).toBe(rowOf("hostile__bulk_export").querySelector("td").textContent);
+  expect(rowOf("hostile__get_stock_price")).toHaveTextContent("forwarded to hostile");
+  expect(table.queryByText(/not entitled|over the cap|outside ToolFilter/)).toBeNull();
+  // the reasons are in the audit pane
+  expect(within(screen.getByTestId("gw-audit-reasons")).getByText("hostile__create_transfer").closest("li")).toHaveTextContent("not entitled");
+  expect(via.getByTestId("gw-hops")).toHaveTextContent("2 of 6 calls reached a member");
+  expect(screen.getByRole("columnheader", { name: "Outcome (demo audit view)" })).toBeInTheDocument();
+  expect(screen.getByText(/never type a secret into it/)).toBeInTheDocument();
 });
 
 test("the entitled caller still receives the poisoned description, as inert text", async () => {
@@ -103,6 +130,39 @@ test("each editable field changes the answer: entitlement, cap, alias, ToolFilte
 
   await userEvent.selectOptions(screen.getByLabelText("When"), "first");
   await waitFor(() => expect(screen.queryByTestId("gw-pin")).toBeNull());
+});
+
+test("the Cap allows checkboxes edit the cap list that is sent, and the listing follows", async () => {
+  render(<Gateway />);
+  await ready();
+  const weather = box("Cap allows: hostile__get_weather");
+  const mail = box("Cap allows: hostile__send_email");
+  expect(weather).toBeChecked();
+  expect(mail).not.toBeChecked();
+  expect(posts.at(-1).policy.capAllow).toEqual(["bank__get_balance", "bank__get_statement", "hostile__get_weather", "hostile__get_stock_price", "hostile__search_docs"]);
+  // take an entitled, capped tool out of the cap: it leaves the listing, the answer says over the cap, and the request carries the edit
+  await userEvent.click(weather);
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
+  expect(posts.at(-1).policy.capAllow).not.toContain("hostile__get_weather");
+  expect(posts.at(-1).policy.capAllow).toHaveLength(4);
+  expect(box("Cap allows: hostile__get_weather")).not.toBeChecked();
+  expect(within(screen.getByTestId("gw-policy")).getByText("hostile__get_weather").closest("tr")).toHaveTextContent("hidden: over the cap");
+  // put it back: the list is whole again
+  await userEvent.click(box("Cap allows: hostile__get_weather"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  expect(posts.at(-1).policy.capAllow).toContain("hostile__get_weather");
+  // add an entitled tool the cap did not allow: it joins the listing
+  await userEvent.click(mail);
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(5));
+  expect(posts.at(-1).policy.capAllow).toContain("hostile__send_email");
+  expect(posts.at(-1).policy.capAllow).toHaveLength(6);
+  // the cap list is only editable while the cap is on, and off sends no cap at all
+  await userEvent.click(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ }));
+  await waitFor(() => expect(posts.at(-1).policy.capAllow).toBeNull());
+  expect(box("Cap allows: hostile__get_weather")).toBeDisabled();
+  await userEvent.click(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ }));
+  await waitFor(() => expect(posts.at(-1).policy.capAllow).toHaveLength(6));
+  expect(box("Cap allows: hostile__get_weather")).toBeEnabled();
 });
 
 test("the task selects what the victim does, on both sides", async () => {

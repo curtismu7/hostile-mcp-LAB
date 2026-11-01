@@ -157,6 +157,7 @@ main:focus { outline: none; }
 .gw__members { list-style: none; padding: 0; margin: 0.4rem 0; display: grid; gap: 0.25rem; }
 .gw__table td, .gw__table th { padding: 0.35rem 0.5rem; }
 .gw__why { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.75rem; font-size: 0.9rem; }
+.gw__audit { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border: 1px dashed var(--border); border-radius: 8px; }
 .gw__claims { padding-left: 1.25rem; }
 .gw__claims li { margin: 0.4rem 0; }
 @media (max-width: 40rem) { .gw__why { grid-template-columns: 1fr; } .gw__names { columns: 1; } }

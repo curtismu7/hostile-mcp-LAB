@@ -83,8 +83,10 @@ export const CHECKS = [
       assert.equal(r.forwardedTo, 'hostile');
       assert.deepEqual(gw.hops().map((h) => `${h.alias}:${h.tool}`), ['bank:get_balance', 'hostile:get_balance', 'hostile:bank__get_balance']);
       // negative control: the spoofed name is not the bank's tool for a caller who was never entitled to it
-      const analyst = build(mod).call(entitledOf('analyst'), 'hostile__bank__get_balance');
-      assert.deepEqual([analyst.ok, analyst.code], [false, 'not-entitled']);
+      const spoofGw = build(mod);
+      const analyst = spoofGw.call(entitledOf('analyst'), 'hostile__bank__get_balance');
+      assert.deepEqual([analyst.ok, analyst.code], [false, 'not_available']);
+      assert.equal(spoofGw.audit().at(-1).reason, 'not-entitled');
     },
   },
   {
@@ -126,13 +128,16 @@ export const CHECKS = [
       const gw = build(mod);
       const analyst = entitledOf('analyst');
       const refused = gw.call(analyst, 'hostile__send_email');
-      assert.deepEqual([refused.ok, refused.code, refused.stage], [false, 'over-cap', 'member-hop']);
+      assert.deepEqual([refused.ok, refused.code, refused.stage], [false, 'not_available', 'member-hop']);
+      assert.equal(gw.audit().at(-1).reason, 'over-cap', 'the demo audit log says why; the caller is not told');
       assert.equal(gw.hops().length, 0, 'the member received nothing');
       const viewer = gw.call(entitledOf('viewer'), 'bank__get_statement');
-      assert.deepEqual([viewer.ok, viewer.code, viewer.stage], [false, 'not-entitled', 'member-hop']);
+      assert.deepEqual([viewer.ok, viewer.code, viewer.stage], [false, 'not_available', 'member-hop']);
+      assert.equal(gw.audit().at(-1).reason, 'not-entitled');
       assert.equal(gw.hops().length, 0);
       // a tool nobody listed, guessed by name, is refused the same way
-      assert.equal(gw.call(analyst, 'hostile__create_transfer').code, 'not-entitled');
+      assert.equal(gw.call(analyst, 'hostile__create_transfer').code, 'not_available');
+      assert.equal(gw.audit().at(-1).reason, 'not-entitled');
       assert.equal(gw.hops().length, 0);
       // negative controls: an entitled, capped tool is forwarded; with no cap the capped one is too
       assert.equal(gw.call(analyst, 'bank__get_balance').ok, true);
@@ -148,7 +153,8 @@ export const CHECKS = [
       const listing = filtered.list(caller);
       assert.deepEqual(sorted(names(listing).filter((n) => n.startsWith('hostile__'))), ['hostile__get_weather', 'hostile__search_docs']);
       assert.equal(listing.hidden.filter((h) => h.reason === 'not-in-toolfilter').length, 11);
-      assert.equal(filtered.call(caller, 'hostile__create_transfer').code, 'not-in-toolfilter');
+      assert.equal(filtered.call(caller, 'hostile__create_transfer').code, 'not_available');
+      assert.equal(filtered.audit().at(-1).reason, 'not-in-toolfilter');
       assert.equal(filtered.hops().length, 0);
       // negative control: no filter, all thirteen hostile tools listed
       assert.equal(build(mod, { cap: null }).list(caller).tools.filter((t) => t.alias === 'hostile').length, 13);
@@ -163,8 +169,11 @@ export const CHECKS = [
       const listing = later.list(entitledOf('analyst'));
       assert.ok(!names(first).includes('hostile__bulk_export') && !names(listing).includes('hostile__bulk_export'));
       assert.equal(listing.hidden.find((h) => h.name === 'hostile__bulk_export').reason, 'not-entitled');
-      assert.equal(later.call(entitledOf('analyst'), 'hostile__bulk_export').code, 'not-entitled');
-      assert.equal(build(mod, { list: 1 }).call(entitledOf('analyst'), 'hostile__bulk_export').code, 'no_such_tool');
+      assert.equal(later.call(entitledOf('analyst'), 'hostile__bulk_export').code, 'not_available');
+      assert.equal(later.audit().at(-1).reason, 'not-entitled');
+      const dayOne = build(mod, { list: 1 });
+      assert.equal(dayOne.call(entitledOf('analyst'), 'hostile__bulk_export').code, 'not_available');
+      assert.equal(dayOne.audit().at(-1).reason, 'no_such_tool', 'on day one the tool did not exist at all');
       // negative controls: entitled but not capped is still removed; entitled and capped is listed (policy, not detection)
       const entitled = { entitled: [...CALLERS.analyst.entitled, 'hostile__bulk_export'] };
       assert.equal(build(mod).list(entitled).hidden.find((h) => h.name === 'hostile__bulk_export').reason, 'over-cap');
@@ -219,7 +228,7 @@ export const CHECKS = [
     id: 'controls-apply-from-the-first-list', row: 'MCP Catalog (entitlement part): controls from the first request',
     run(mod) {
       const gw = build(mod, { list: 1 });
-      assert.deepEqual(sorted(Object.keys(gw)), ['aliases', 'call', 'hops', 'list'], 'there is no unfiltered way to list');
+      assert.deepEqual(sorted(Object.keys(gw)), ['aliases', 'audit', 'call', 'hops', 'list'], 'there is no unfiltered way to list');
       assert.equal(refusedCode(() => gw.list()), 'bad_caller');
       const first = gw.list(entitledOf('analyst'));
       assert.equal(first.tools.length, 4);
@@ -256,7 +265,8 @@ export const CHECKS = [
       assert.equal(listing.hidden.filter((h) => h.reason === 'invalid-name').length, 4);
       assert.equal(listing.hidden.filter((h) => h.reason === 'duplicate-in-member').length, 1);
       assert.equal(gw.call(caller, 'hostile__constructor').forwardedTo, 'hostile');
-      assert.equal(gw.call({ entitled: [] }, 'hostile__constructor').code, 'not-entitled');
+      assert.equal(gw.call({ entitled: [] }, 'hostile__constructor').code, 'not_available');
+      assert.equal(gw.audit().at(-1).reason, 'not-entitled');
       // one member offering 150 tools is cut at 100 before anything is decided, and says so
       const many = Array.from({ length: 150 }, (_, i) => ({ name: `t${i}`, description: '', inputSchema: {} }));
       const want = [...many.slice(0, 32), ...many.slice(100, 132)].map((t) => `hostile__${t.name}`);
@@ -276,18 +286,51 @@ export const CHECKS = [
     },
   },
   {
+    id: 'refusal-does-not-reveal-hidden-tools', row: 'a refused call answers the same for a hidden tool and a missing one',
+    run(mod) {
+      const gw = build(mod);
+      const analyst = entitledOf('analyst');
+      const hiddenByEntitlement = gw.call(analyst, 'hostile__create_transfer');
+      const hiddenByCap = gw.call(analyst, 'hostile__send_email');
+      const missing = gw.call(analyst, 'hostile__no_such_tool_at_all');
+      assert.deepEqual(hiddenByEntitlement, { ok: false, code: 'not_available', stage: 'member-hop' });
+      assert.deepEqual(hiddenByCap, hiddenByEntitlement, 'hidden by the cap looks like hidden by entitlement');
+      assert.deepEqual(missing, hiddenByEntitlement, 'a tool that does not exist looks like a hidden one');
+      const filtered = build(mod, { hostileFilter: ['get_weather'] }).call(analyst, 'hostile__get_stock_price');
+      assert.deepEqual(filtered, hiddenByEntitlement, 'outside the ToolFilter looks the same too');
+      // the demo audit log is where the reasons live, and it tells the three apart
+      assert.deepEqual(gw.audit(), [{ name: 'hostile__create_transfer', reason: 'not-entitled' }, { name: 'hostile__send_email', reason: 'over-cap' }, { name: null, reason: 'no_such_tool' }]);
+      assert.equal(gw.hops().length, 0);
+      // an unreachable member is reported in the listing, so every name under it gets the same answer, real or not
+      const down = build(mod, { bankUp: false });
+      assert.deepEqual(down.call(analyst, 'bank__get_balance'), down.call(analyst, 'bank__nothing_here'));
+      assert.equal(down.call(analyst, 'bank__get_balance').code, 'member_unreachable');
+      // negative control: a listed, entitled, capped tool is forwarded and is nothing like the refusal
+      const ok = gw.call(analyst, 'bank__get_balance');
+      assert.deepEqual([ok.ok, ok.code, ok.forwardedTo], [true, 'forwarded', 'bank']);
+      // the audit log is bounded
+      for (let i = 0; i < 300; i += 1) gw.call(analyst, `hostile__missing_${i}`);
+      assert.equal(gw.audit().length, 256);
+    },
+  },
+  {
     id: 'a-typed-credential-is-never-echoed', row: 'no credential echoed',
     run(mod) {
       const gw = build(mod);
       const caller = { entitled: [...CALLERS.analyst.entitled, `bank__${SECRET}`, SECRET] };
       const out = [];
       out.push(gw.list(caller));
-      for (const name of [`Bearer ${SECRET}`, SECRET, `bank__${SECRET}`, `${SECRET}__get_balance`, `hostile__${SECRET}`]) out.push(gw.call(caller, name, { token: SECRET, password: SECRET }));
+      const callerSide = [];
+      for (const name of [`Bearer ${SECRET}`, SECRET, `bank__${SECRET}`, `${SECRET}__get_balance`, `hostile__${SECRET}`]) callerSide.push(gw.call(caller, name, { token: SECRET, password: SECRET }));
+      out.push(...callerSide);
       out.push(gw.call(caller, 'bank__get_balance', { token: SECRET, authorization: `Bearer ${SECRET}` }));
       const err = (() => { try { build(mod, { bankAlias: SECRET }); } catch (e) { return e; } return null; })();
       out.push({ message: err?.message, code: err?.code });
       assert.equal(err?.code, 'bad_alias');
-      assert.ok(!JSON.stringify(out).includes(SECRET), 'no response field or error carries what was typed');
+      out.push(gw.audit());
+      assert.equal(gw.audit().length, 2, 'the two typed names under a real member were refused as not available and logged, with no name');
+      assert.ok(gw.audit().every((a) => a.name === null));
+      assert.ok(!JSON.stringify(out).includes(SECRET), 'no response field, audit entry or error carries what was typed');
       assert.equal(gw.hops().length, 1);
       assert.ok(!JSON.stringify(gw.hops()).includes(SECRET));
     },
@@ -342,6 +385,9 @@ export const SCENARIO_CHECKS = [
       const attempt = Object.fromEntries(r.gateway.attempts.map((a) => [a.name, a]));
       assert.equal(attempt.hostile__create_transfer.ok, false);
       assert.equal(attempt.create_transfer.code, 'unprefixed');
+      assert.deepEqual([attempt.hostile__create_transfer.code, attempt.hostile__create_transfer.auditReason], ['not_available', 'not-entitled']);
+      assert.equal(attempt.hostile__bulk_export.code, attempt.hostile__create_transfer.code, 'a late tool and an action tool get the same caller-side answer');
+      assert.equal(attempt.bank__get_balance.auditReason, null, 'a forwarded call has nothing in the audit log');
       assert.equal(attempt.bank__get_balance.forwardedTo, 'bank');
       assert.equal(r.gateway.memberHops, 2);
       assert.equal(r.gateway.attempts.length, 6);
@@ -368,9 +414,14 @@ export const SCENARIO_CHECKS = [
       const r = await run(mod, { policy: { aliases: { hostile: 'ext' }, entitled: ['bank__get_balance', 'ext__get_weather'], capAllow: null } });
       assert.deepEqual(listOf(r), ['bank__get_balance', 'ext__get_weather']);
       assert.equal(r.members.find((m) => m.key === 'hostile').alias, 'ext');
-      assert.equal(r.gateway.attempts.find((a) => a.name === 'ext__get_stock_price').code, 'not-entitled');
+      const stock = r.gateway.attempts.find((a) => a.name === 'ext__get_stock_price');
+      assert.deepEqual([stock.code, stock.auditReason], ['not_available', 'not-entitled'], 'the caller is told not_available; the demo audit view says why');
       const silent = await run(mod, { policy: { aliases: { hostile: 'ext' } } });
       assert.deepEqual(listOf(silent), ['bank__get_balance', 'bank__get_statement'], 'renaming without updating entitlements fails closed');
+      // the bank's alias is an editable field of its own
+      const bankRenamed = await run(mod, { policy: { aliases: { bank: 'acct' }, entitled: ['acct__get_balance', 'hostile__get_weather'], capAllow: null } });
+      assert.deepEqual(listOf(bankRenamed), ['acct__get_balance', 'hostile__get_weather']);
+      assert.equal(bankRenamed.members.find((m) => m.key === 'bank').alias, 'acct');
       assert.equal(silent.policy.ignoredEntries, 6, 'three entitlement entries and three cap entries name the old prefix and match nothing; they are counted, not shown');
     },
   },
@@ -403,6 +454,7 @@ export const SCENARIO_CHECKS = [
       assert.ok(r.gateway.hidden.some((h) => h.name === 'hostile__get_stock_price' && h.reason === 'not-in-toolfilter'));
       const bank = await run(mod, { policy: { toolFilter: { bank: ['get_statement'] } } });
       assert.ok(!listOf(bank).includes('bank__get_balance') && listOf(bank).includes('bank__get_statement'));
+      assert.equal(r.members[1].toolFilter.length, 1);
       const cleared = await run(mod, { policy: { toolFilter: { hostile: null } } });
       assert.equal(cleared.gateway.count, 4);
     },
@@ -419,6 +471,18 @@ export const SCENARIO_CHECKS = [
       assert.equal(r.gateway.attempts.find((a) => a.name === 'hostile__get_stock_price').code, 'member_unreachable');
       const up = await run(mod, { policy: { reachable: { hostile: true } } });
       assert.deepEqual([up.gateway.unreachable, up.direct.silentlyMissing], [[], []]);
+      // the bank is an editable member too: marking it unreachable must change the answer, not be ignored
+      const bankDown = await run(mod, { policy: { reachable: { bank: false } } });
+      assert.deepEqual(bankDown.gateway.unreachable, ['bank']);
+      assert.deepEqual(listOf(bankDown), ['hostile__get_stock_price', 'hostile__get_weather']);
+      assert.deepEqual(bankDown.direct.silentlyMissing, ['bank']);
+      assert.equal(bankDown.direct.count, 13);
+      assert.equal(bankDown.members.find((m) => m.key === 'bank').reachable, false);
+      assert.equal(bankDown.members.find((m) => m.key === 'hostile').reachable, true);
+      assert.equal(bankDown.gateway.attempts.find((a) => a.name === 'bank__get_balance').code, 'member_unreachable');
+      const bothDown = await run(mod, { policy: { reachable: { bank: false, hostile: false } } });
+      assert.deepEqual(bothDown.gateway.unreachable, ['bank', 'hostile']);
+      assert.equal(bothDown.gateway.count, 0);
     },
   },
   {
@@ -463,6 +527,21 @@ export const SCENARIO_CHECKS = [
       assert.ok(!JSON.stringify(r).includes(SECRET));
       assert.equal(r.policy.ignoredEntries, 2);
       assert.equal(r.policy.entitled.length, 5);
+      // a typed ToolFilter entry is held to the same rule: only names the member really has come back, the rest are counted
+      const filtered = await run(mod, { policy: { toolFilter: { bank: [`${SECRET}-bank`, 'get_balance'], hostile: ['get_weather', `sk-live-${SECRET}`, 'nonexistent_tool_x'] } } });
+      assert.ok(!JSON.stringify(filtered).includes(SECRET), 'no response field carries a typed ToolFilter entry');
+      assert.ok(!JSON.stringify(filtered).includes('nonexistent_tool_x'));
+      assert.deepEqual(filtered.members.map((m) => m.toolFilter), [['get_balance'], ['get_weather']]);
+      assert.equal(filtered.policy.ignoredEntries, 3, 'the three entries that match no tool are counted, never shown');
+      assert.deepEqual(listOf(filtered), ['bank__get_balance', 'hostile__get_weather']);
+      // negative control: with real names only, the filter comes back whole and nothing is ignored
+      const real = await run(mod, { policy: { toolFilter: { hostile: ['get_weather', 'get_stock_price'] } } });
+      assert.deepEqual(real.members.map((m) => m.toolFilter), [null, ['get_weather', 'get_stock_price']]);
+      assert.equal(real.policy.ignoredEntries, 0);
+      // an alias is a public label in every namespaced name: it is bounded and patterned, and it does come back (by design)
+      const aliased = await run(mod, { policy: { aliases: { hostile: 'ext-1' }, capAllow: null } });
+      assert.equal(aliased.members[1].alias, 'ext-1');
+      assert.equal(policyError(mod, { policy: { aliases: { hostile: `${SECRET}` } } })?.name, 'PolicyError', 'a mixed-case, underscore value is not a valid alias, so a typical token is refused');
       assert.deepEqual(listOf(r), ['bank__get_balance', 'bank__get_statement', 'hostile__get_stock_price', 'hostile__get_weather']);
     },
   },

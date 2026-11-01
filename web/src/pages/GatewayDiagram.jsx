@@ -124,7 +124,7 @@ export default function GatewayDiagram({ result, ready, resetToken, onReset, the
   return (
     <section className="card gw__diagram" aria-labelledby="gw-diagram-h" data-testid="gw-diagram">
       <h3 id="gw-diagram-h">Where the two checks sit</h3>
-      <p className="muted small">Drag any box (on a phone, drag the background to pan). Simulate walks the chosen view with the numbers from the last run. Reset puts the policy, the boxes and the walk back to the start.</p>
+      <p className="muted small">Drag any box (on a phone, drag the background to pan). Simulate walks the chosen view with the numbers from the last run. Reset puts the policy, the boxes and the walk back to the start. The captions narrate with the demo audit numbers; the caller is not shown them.</p>
       <div className="controls">
         <label>View
           <select value={view} onChange={(e) => pickView(e.target.value)}>

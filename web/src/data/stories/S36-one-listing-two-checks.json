@@ -21,7 +21,7 @@
     {
       "n": 2,
       "title": "Filter by what this caller may see",
-      "tell": "The gateway lists only the tools {{lena}}'s assistant is entitled to. The viewer, entitled to fewer, gets fewer. The admin's audit view shows what was hidden and why.",
+      "tell": "The gateway lists only the tools {{lena}}'s assistant is entitled to. The viewer, entitled to fewer, gets fewer. The demo audit pane on the page, an administrator's view that the caller never sees, shows what was hidden and why.",
       "say": "The listing is different for every caller, because it is filtered by who is asking.",
       "why": "A tool the caller cannot see is a tool a hostile description cannot talk the model into using."
     },
@@ -35,7 +35,7 @@
     {
       "n": 4,
       "title": "A tool that appears after approval",
-      "tell": "The next morning the hostile server lists bulk_export, which was not there when {{mark}} approved. It is not entitled and not under the cap, so it is not listed and a call to it is refused before it reaches the server.",
+      "tell": "The next morning the hostile server lists bulk_export, which was not there when {{mark}} approved. It is not entitled and not under the cap, so it is not listed and a call to it is told only: not available, the same words as for a tool that does not exist, before it reaches the server.",
       "say": "A tool that shows up later is removed unless someone entitled it and capped it in.",
       "why": "Approval was about a list. The gateway enforces that list again on every call."
     },
@@ -56,7 +56,7 @@
   ],
   "proof": {
     "happy": "No gateway: the page counts every tool the two servers list, shows get_balance defined twice, and the victim plans a transfer.",
-    "blocked": "With the gateway: the page counts what was listed and what was hidden for this caller, the transfer is neither listed nor reachable (0 calls reach a member), and the pinned client still reports the changed stock-price tool."
+    "blocked": "With the gateway: the page counts what was listed, its demo audit pane counts what was hidden for this caller, the transfer is neither listed nor reachable (0 calls reach a member), and the pinned client still reports the changed stock-price tool."
   },
   "say": "One listing, one policy, checked when the list is made and again when the call is forwarded. It filters; it does not judge."
 }

@@ -90,8 +90,11 @@ function buildGateway(policy, listNumber, hostileTools) {
   });
 }
 
-// Only names that really are in the catalog are echoed: a policy entry nobody can match is counted, never shown.
+// Only names that really are in the catalog are echoed: a policy entry nobody can match is counted, never shown. That holds
+// for the entitlement list, the cap list and each member's ToolFilter. (An alias is the one typed value that comes back:
+// it is a public label that is part of every namespaced name, and it is bounded to 24 characters of a-z, 0-9 and dash.)
 const knownNames = (policy, hostileTools) => new Set(MEMBER_KEYS.flatMap((k) => memberTools(k, 2, hostileTools).map((t) => `${policy.aliases[k]}${SEP}${t.name}`)));
+const knownTools = (key, hostileTools) => new Set(memberTools(key, 2, hostileTools).map((t) => t.name));
 
 export async function runGateway(request) {
   const { stage, caller, task, policy } = request;
@@ -141,12 +144,16 @@ export async function runGateway(request) {
     }
 
     const known = knownNames(policy, current.tools);
+    const toolsOf = new Map(MEMBER_KEYS.map((key) => [key, knownTools(key, current.tools)]));
     const hiddenView = listing.hidden.map((h) => ({ name: h.name, alias: h.alias, reason: h.reason }));
     const bare = (key) => policy.aliases[key];
     const attemptNames = [`${bare('bank')}${SEP}get_balance`, `${bare('hostile')}${SEP}get_stock_price`, `${bare('hostile')}${SEP}create_transfer`, `${bare('hostile')}${SEP}bulk_export`, 'create_transfer', `${bare('hostile')}${SEP}bank${SEP}get_balance`];
+    // code is what the caller is told; auditReason is the demo audit view of why (a real gateway keeps it from the caller).
     const attempts = attemptNames.map((name) => {
+      const before = gw.audit().length;
       const r = gw.call({ entitled: policy.entitled }, name, {});
-      return { name, ok: r.ok, code: r.code, stage: r.stage, forwardedTo: r.forwardedTo ?? null };
+      const entry = gw.audit().slice(before)[0];
+      return { name, ok: r.ok, code: r.code, stage: r.stage, forwardedTo: r.forwardedTo ?? null, auditReason: entry ? entry.reason : null };
     });
     const bareHit = (name) => direct.some((t) => t.name === name);
     const directAttempts = [{ name: 'create_transfer', reached: bareHit('create_transfer') }, { name: 'bulk_export', reached: bareHit('bulk_export') }];
@@ -157,11 +164,12 @@ export async function runGateway(request) {
 
     return {
       stage, caller, task, listNumber,
-      members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], alias: policy.aliases[key], reachable: policy.reachable[key], toolFilter: policy.toolFilter[key] })),
+      members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], alias: policy.aliases[key], reachable: policy.reachable[key], toolFilter: policy.toolFilter[key] === null ? null : policy.toolFilter[key].filter((n) => toolsOf.get(key).has(n)) })),
       policy: {
         entitled: policy.entitled.filter((n) => known.has(n)),
         capAllow: policy.capAllow === null ? null : policy.capAllow.filter((n) => known.has(n)),
-        ignoredEntries: policy.entitled.filter((n) => !known.has(n)).length + (policy.capAllow === null ? 0 : policy.capAllow.filter((n) => !known.has(n)).length),
+        ignoredEntries: policy.entitled.filter((n) => !known.has(n)).length + (policy.capAllow === null ? 0 : policy.capAllow.filter((n) => !known.has(n)).length)
+          + MEMBER_KEYS.reduce((n, key) => n + (policy.toolFilter[key] === null ? 0 : policy.toolFilter[key].filter((t) => !toolsOf.get(key).has(t)).length), 0),
       },
       direct: { count: direct.length, tools: direct, collisions, silentlyMissing, attempts: directAttempts, victim: victimDirect },
       gateway: {

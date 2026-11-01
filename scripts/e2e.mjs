@@ -122,6 +122,26 @@ try {
   await page.getByRole('button', { name: 'Reset' }).click();
   await shot('5-diagram');
 
+  // Gateway tab: the claim banner, the demo audit pane, and a real drag that Reset undoes (jsdom cannot drag).
+  await go('gateway');
+  await page.getByRole('button', { name: 'Simulate' }).and(page.locator(':enabled')).waitFor({ timeout: 20000 });
+  check((await page.getByTestId('claim-banner').innerText()).includes('UNVERIFIED on our tenant'), 'gateway tab carries the release-claim banner');
+  check((await page.getByTestId('gw-audit').innerText()).includes('Demo audit pane'), 'gateway tab labels the hidden list as a demo audit pane');
+  const gwBox = async () => { const b = await page.locator('.react-flow__node[data-id="gw"]').boundingBox(); return { x: b.x, y: b.y }; };
+  await page.locator('.gw__diagram').scrollIntoViewIfNeeded();
+  const before = await gwBox();
+  await page.mouse.move(before.x + 20, before.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 20, before.y + 95, { steps: 8 });
+  await page.mouse.up();
+  const dragged = await gwBox();
+  check(Math.abs(dragged.y - before.y) > 40, `a dragged box stays where it was dropped (moved ${Math.round(dragged.y - before.y)}px)`);
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await sleep(500);
+  const restored = await gwBox();
+  check(Math.abs(restored.x - before.x) < 2 && Math.abs(restored.y - before.y) < 2, 'Reset puts the dragged box back');
+  await shot('6-gateway');
+
   // Safety: the browser only talked to the app itself.
   check(external.length === 0, `no request left the app origin${external.length ? `: ${external.join(', ')}` : ''}`);
 } finally {

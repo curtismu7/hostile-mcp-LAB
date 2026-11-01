@@ -12,6 +12,7 @@ import WHY from "../data/whyItMatters.json";
 const MEMBERS = ["bank", "hostile"];
 const STAGES = [["first", "Day one: the first list"], ["later", "The morning after: the next list"]];
 const split = (t) => t.split(/[\s,]+/).filter(Boolean);
+const told = (code) => code.replace(/_/g, " ");
 const REASON = { "not-entitled": "not entitled", "over-cap": "over the cap", "not-in-toolfilter": "outside ToolFilter", "duplicate-in-member": "defined twice by the member", "invalid-name": "invalid name" };
 
 export const initialEditor = (cfg, caller = "analyst") => ({
@@ -62,17 +63,37 @@ function Direct({ r }) {
   );
 }
 
+function Audit({ g }) {
+  return (
+    <aside className="gw__audit" aria-labelledby="gw-audit-h" data-testid="gw-audit">
+      <h4 id="gw-audit-h">Demo audit pane</h4>
+      <p className="muted small">This is an administrator's view, shown here so you can see why. The caller is not shown it: a caller sees only the listed tools and, for a refused call, the words <code>not available</code>, the same for a hidden tool and one that does not exist (a lab reading; the release claim does not say).</p>
+      <p className="small" data-testid="gw-audit-hidden"><strong>{g.hiddenCount}</strong> tools hidden from this caller.</p>
+      <ul className="small">
+        {g.members.map((m) => (
+          <li key={m.alias}><code>{m.alias}</code>: {m.status === "ok" ? `${m.listed} of ${m.offered} offered tools listed` : "unreachable, nothing offered"}</li>
+        ))}
+      </ul>
+      <p className="small">Why each probe call was refused:</p>
+      <ul className="small" data-testid="gw-audit-reasons">
+        {g.attempts.map((a) => <li key={a.name}><code>{a.name}</code>: {a.ok ? `forwarded to ${a.forwardedTo}` : (a.auditReason ? (REASON[a.auditReason] ?? told(a.auditReason)) : told(a.code))}</li>)}
+      </ul>
+      <p className="small" data-testid="gw-hops"><strong>{g.memberHops}</strong> of {g.attempts.length} calls reached a member.</p>
+    </aside>
+  );
+}
+
 function Via({ r }) {
   const g = r.gateway;
   return (
     <section className="card col" aria-label="Entitlement filter plus cap" data-testid="gw-gateway">
       <h3>Entitlement filter plus cap</h3>
-      <p className="verdict ok" role="status" data-testid="gw-gateway-count">{g.count} tools listed, {g.hiddenCount} hidden for this caller</p>
+      <p className="verdict ok" role="status" data-testid="gw-gateway-count">{g.count} tools listed</p>
       <ul className="gw__members small">
         {g.members.map((m) => (
           <li key={m.alias} data-testid={`gw-member-${m.alias}`}>
             <code>{m.alias}</code>{" "}
-            {m.status === "ok" ? <span className="pill yes">reachable, {m.listed} of {m.offered} listed</span> : <span className="pill no">unreachable: reported, not dropped</span>}
+            {m.status === "ok" ? <span className="pill yes">reachable</span> : <span className="pill no">unreachable: reported, not dropped</span>}
           </li>
         ))}
       </ul>
@@ -91,24 +112,24 @@ function Via({ r }) {
       <h4>Calls, checked again at the member hop</h4>
       <div className="table-wrap">
         <table className="gw__table" data-testid="gw-attempts">
-          <thead><tr><th scope="col">Call</th><th scope="col">Result</th><th scope="col">Where</th></tr></thead>
+          <thead><tr><th scope="col">Call</th><th scope="col">The caller is told</th><th scope="col">Where</th></tr></thead>
           <tbody>
             {g.attempts.map((a) => (
               <tr key={a.name}>
                 <th scope="row"><code>{a.name}</code></th>
-                <td>{a.ok ? `forwarded to ${a.forwardedTo}` : `refused: ${a.code}`}</td>
+                <td>{a.ok ? `forwarded to ${a.forwardedTo}` : `refused: ${told(a.code)}`}</td>
                 <td>{a.stage}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="small" data-testid="gw-hops"><strong>{g.memberHops}</strong> of {g.attempts.length} calls reached a member.</p>
       {g.pin && (
         <p className="small" data-testid="gw-pin"><strong>Pinned client, list #{g.pin.approvedFromList} against list #{g.pin.checkedList}:</strong> {g.pin.changed.length ? `changed: ${g.pin.changed.join(", ")}. The gateway kept it listed; pinning is what noticed.` : "nothing changed."}</p>
       )}
       <h4>The call the victim would make</h4>
       <p data-testid="gw-gateway-victim"><code>{callsText(g.victim)}</code></p>
+      <Audit g={g} />
     </section>
   );
 }
@@ -192,7 +213,7 @@ export default function Gateway({ present, theme = "system" }) {
 
       <section className="card gw__editor" aria-labelledby="gw-editor-h">
         <h3 id="gw-editor-h">The policy you can edit</h3>
-        <p className="muted small">Entitlements and the cap are written against the namespaced name, so renaming an alias without updating them hides that server's tools: it fails closed. The Reset button under the diagram puts every field back.</p>
+        <p className="muted small">Entitlements and the cap are written against the namespaced name, so renaming an alias without updating them hides that server's tools: it fails closed. An alias is a public label that appears in every tool name, so never type a secret into it. The Reset button under the diagram puts every field back.</p>
         <div className="controls">
           {MEMBERS.map((k) => (
             <fieldset key={k} className="gw__member">
@@ -214,7 +235,7 @@ export default function Gateway({ present, theme = "system" }) {
         </div>
         <div className="table-wrap">
           <table className="gw__table" data-testid="gw-policy">
-            <thead><tr><th scope="col">Tool</th><th scope="col">Entitled</th><th scope="col">Cap allows</th><th scope="col">Outcome</th></tr></thead>
+            <thead><tr><th scope="col">Tool</th><th scope="col">Entitled</th><th scope="col">Cap allows</th><th scope="col">Outcome (demo audit view)</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={`${row.key}-${row.tool}`}>
