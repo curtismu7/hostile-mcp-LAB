@@ -4,6 +4,7 @@ import Run from "./pages/Run.jsx";
 import RugPull from "./pages/RugPull.jsx";
 import Limits from "./pages/Limits.jsx";
 import Diagram from "./pages/Diagram.jsx";
+import Gateway from "./pages/Gateway.jsx";
 import { getHealth } from "./lib/api.js";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
@@ -11,6 +12,7 @@ export const PAGES = [
   ["gallery", "Gallery", Gallery],
   ["run", "Run the victim", Run],
   ["rugpull", "Rug-pull", RugPull],
+  ["gateway", "Gateway", Gateway],
   ["limits", "Honest limits", Limits],
   ["diagram", "Diagram", Diagram],
 ];
@@ -49,6 +51,9 @@ export default function App() {
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       <div className="banner" role="note" data-testid="banner">
         <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
+      </div>
+      <div className="claim-banner" role="note" data-testid="claim-banner">
+        <strong>Ping release claim (2026-11-02), UNVERIFIED on our tenant.</strong> Entitlement-aware discovery and the aggregate policy cap are simulated in this process. This app runs offline only: there is no live mode, and no live path until the release is on our tenant.
       </div>
       {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
       <header className="top">

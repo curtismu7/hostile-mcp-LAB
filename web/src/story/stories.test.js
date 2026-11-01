@@ -3,10 +3,10 @@ import { STORIES, VERTICALS, storyForMode } from "./stories.js";
 import { fillAll, tokensIn } from "./fill.js";
 import { validateStory, validateVertical } from "./storySchema.js";
 
-test("both stories and all three packs are valid", () => {
-  expect(STORIES.map((s) => s.id)).toEqual(["S05", "S14"]);
+test("all three stories and all three packs are valid", () => {
+  expect(STORIES.map((s) => s.id)).toEqual(["S05", "S14", "S36"]);
   expect(VERTICALS.map((v) => v.id).sort()).toEqual(["airlines", "banking", "generic"]);
-  for (const s of STORIES) expect(validateStory(s, { modes: ["gallery", "run", "rugpull", "limits", "diagram"], stepRange: [1, 6] })).toEqual([]);
+  for (const s of STORIES) expect(validateStory(s, { modes: ["gallery", "run", "rugpull", "limits", "diagram", "gateway"], stepRange: [1, 6] })).toEqual([]);
   for (const v of VERTICALS) expect(validateVertical(v)).toEqual([]);
 });
 
@@ -23,6 +23,7 @@ test("the stories sit on their pages and the banking pack changes the wording", 
   expect(storyForMode("diagram").id).toBe("S05");
   expect(storyForMode("run").id).toBe("S14");
   expect(storyForMode("gallery").id).toBe("S14");
+  expect(storyForMode("gateway").id).toBe("S36");
   expect(storyForMode("limits")).toBeNull();
   const banking = VERTICALS.find((v) => v.id === "banking");
   expect(JSON.stringify(fillAll(STORIES[0], banking))).toContain("the bank");

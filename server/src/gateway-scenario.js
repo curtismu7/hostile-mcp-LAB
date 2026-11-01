@@ -8,8 +8,8 @@
 // The hostile member's tools come from the real server over the in-memory session (session.js), so list #1 and list #2
 // are the real clean and rug-pulled answers. Pinning (pinning.js) runs on the gateway listing to show the filter does
 // not replace it. No network, no clock, no randomness. Every Ping product claim here is UNVERIFIED on our tenant.
-import { createGateway, GatewayConfigError, SEP } from './gateway.js';
-import { APP_REFS, CALLERS, DEFAULT_ALIASES, DEFAULT_CAP, MEMBER_KEYS, REGISTRY, TASKS, memberTools } from './gateway-fixtures.js';
+import { createGateway, GatewayConfigError, SEP, TAGS } from './gateway.js';
+import { APP_REFS, CALLERS, DEFAULT_ALIASES, DEFAULT_CAP, MEMBER_KEYS, REGISTRY, TASKS, hostileCatalog, memberTools } from './gateway-fixtures.js';
 import { createPinnedClient } from './pinning.js';
 import { BANK_ORIGIN, HOSTILE_ORIGIN, createSession } from './session.js';
 import { runVictim } from './victim.js';
@@ -180,4 +180,12 @@ export const gatewayConfig = (hostileTools) => ({
   members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], tools: memberTools(key, 2, hostileTools).map((t) => t.name) })),
   tasks: [...TASKS],
   limits: { maxEntries: MAX_ENTRIES, maxName: MAX_NAME },
+});
+
+// GET /api/gateway/config: what the page starts from, and what it must say about itself.
+export const gatewayConfigResponse = () => ({
+  ...gatewayConfig(hostileCatalog(2)),
+  tags: TAGS,
+  status: 'Ping release claim (2026-11-02), UNVERIFIED on our tenant',
+  mode: 'Offline simulation, no live path',
 });

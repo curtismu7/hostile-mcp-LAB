@@ -16,3 +16,5 @@ export const listTools = (id) => post(`/api/mcp-session/${id}/list`);
 export const approve = (id) => post(`/api/mcp-session/${id}/approve`);
 export const endSession = (id) => request(`/api/mcp-session/${id}`, { method: "DELETE" }).catch(() => {});
 export const getHealth = () => request("/api/health");
+export const getGatewayConfig = () => request("/api/gateway/config");
+export const runGateway = (body) => post("/api/gateway/run", body);
