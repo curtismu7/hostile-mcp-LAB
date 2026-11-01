@@ -142,6 +142,45 @@ try {
   check(Math.abs(restored.x - before.x) < 2 && Math.abs(restored.y - before.y) < 2, 'Reset puts the dragged box back');
   await shot('6-gateway');
 
+  // The same diagram on a phone: the canvas is narrower than the diagram, so some labels are off-canvas until you pan. A drag
+  // of a box must not make that worse: the view does not pan by itself, so no further label is pushed out of view.
+  const phone = await browser.newPage({ viewport: { width: 375, height: 800 } });
+  try {
+    await phone.goto(`${base}/#/gateway`);
+    await phone.reload();
+    await phone.getByRole('button', { name: 'Simulate' }).and(phone.locator(':enabled')).waitFor({ timeout: 20000 });
+    await phone.locator('.gw__diagram').scrollIntoViewIfNeeded();
+    await sleep(1500);
+    const labelsOutside = () => phone.evaluate(() => {
+      const c = document.querySelector('.react-flow').getBoundingClientRect();
+      return [...document.querySelectorAll('.react-flow__edge-textwrapper')].filter((e) => { const r = e.getBoundingClientRect(); return r.left < c.left - 1 || r.right > c.right + 1 || r.top < c.top - 1 || r.bottom > c.bottom + 1; }).map((e) => e.textContent.trim());
+    });
+    const viewport = () => phone.evaluate(() => document.querySelector('.react-flow__viewport').style.transform);
+    const outsideBefore = await labelsOutside();
+    const viewBefore = await viewport();
+    // the first box whose centre is inside the canvas (the Aggregate gateway box, which sits half behind the left edge)
+    const target = await phone.evaluate(() => {
+      const c = document.querySelector('.react-flow').getBoundingClientRect();
+      for (const n of document.querySelectorAll('.react-flow__node')) {
+        const r = n.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        if (x > c.left + 10 && x < c.right - 10 && y > c.top + 10 && y < c.bottom - 10) return { id: n.dataset.id, x, y };
+      }
+      return null;
+    });
+    check(target !== null, 'phone: a box is inside the canvas to drag');
+    await phone.mouse.move(target.x, target.y);
+    await phone.mouse.down();
+    await phone.mouse.move(target.x + 60, target.y + 50, { steps: 8 });
+    await phone.mouse.up();
+    await sleep(700);
+    const moved = await phone.locator(`.react-flow__node[data-id="${target.id}"]`).boundingBox();
+    check(Math.abs(moved.x + moved.width / 2 - target.x) > 30, `phone: the dragged box moved (${target.id})`);
+    check((await viewport()) === viewBefore, 'phone: dragging a box does not pan the view');
+    const outsideAfter = await labelsOutside();
+    check(outsideAfter.length <= outsideBefore.length, `phone: a drag pushes no further label out of view (${outsideBefore.length} off-canvas before, ${outsideAfter.length} after)`);
+  } finally { await phone.close(); }
+
   // Safety: the browser only talked to the app itself.
   check(external.length === 0, `no request left the app origin${external.length ? `: ${external.join(', ')}` : ''}`);
 } finally {

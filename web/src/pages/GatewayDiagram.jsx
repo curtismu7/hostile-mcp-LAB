@@ -102,7 +102,7 @@ export default function GatewayDiagram({ result, ready, resetToken, onReset, the
   const flow = useRef(null);
   useEffect(() => {
     setPlaced({ gateway: START, direct: START_DIRECT }); setStep(-1); setRunning(false);
-    const t = setTimeout(() => flow.current?.fitView(FIT), 50); // autopan during a drag can move the view too
+    const t = setTimeout(() => flow.current?.fitView(FIT), 50);
     return () => clearTimeout(t);
   }, [resetToken]);
 
@@ -142,7 +142,7 @@ export default function GatewayDiagram({ result, ready, resetToken, onReset, the
       </div>
       <div className="flow-wrap" role="group" aria-label="Diagram of two servers, the aggregate gateway, the entitlement filter, the policy cap and the caller. Boxes can be dragged.">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} colorMode={theme}
-          fitView fitViewOptions={FIT} onInit={(i) => { flow.current = i; }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2} key={view}>
+          fitView fitViewOptions={FIT} onInit={(i) => { flow.current = i; }} nodesConnectable={false} autoPanOnNodeDrag={false} proOptions={{ hideAttribution: true }} minZoom={0.2} key={view}>
           <Background />
           <Controls showInteractive={false} />
         </ReactFlow>
