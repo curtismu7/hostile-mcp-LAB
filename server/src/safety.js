@@ -4,6 +4,7 @@
 //     .example TLD, or the apex of example.com / example.net / example.org (never a subdomain). No real host, no IP address.
 import { mockOnly } from './mockonly.js';
 import { POISON_PROMPTS, POISONS, POISON_RESOURCES } from './poisons.js';
+import { SIMULATED_TOOLS } from './gateway-fixtures.js';
 import { ACTION_TOOLS, READ_TICKET, callResultText, rugPullTool } from './mcp/tools.js';
 
 export function isLoopbackHost(host) {
@@ -67,7 +68,7 @@ export function scanHosts(text) {
 
 // Every payload string the server can put on the wire: both rug-pull states, resources, prompts, every call result.
 export function payloadCorpus() {
-  const tools = [...POISONS.map((p) => p.tool), READ_TICKET, rugPullTool(1), rugPullTool(2), ...ACTION_TOOLS];
+  const tools = [...POISONS.map((p) => p.tool), READ_TICKET, rugPullTool(1), rugPullTool(2), ...ACTION_TOOLS, ...SIMULATED_TOOLS];
   const results = [...tools.map((t) => callResultText(t.name, { amount: 1, to: 'external-001', user: 'u', ticket_id: 'T-1' }))];
   return [
     ...tools.map((t) => ({ where: `tool ${t.name}`, text: JSON.stringify(t) })),

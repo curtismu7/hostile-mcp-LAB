@@ -19,6 +19,21 @@ test("the hostile-server banner is on screen on every page", async () => {
   }
 });
 
+test("the release-claim banner is on every page, and stays in presenter mode", async () => {
+  render(<App />);
+  const claim = /Ping release claim \(2026-11-02\), UNVERIFIED on our tenant/;
+  const check = () => {
+    expect(screen.getByTestId("claim-banner")).toHaveTextContent(claim);
+    expect(screen.getByTestId("claim-banner")).toHaveTextContent(/no live mode/);
+    expect(screen.getByTestId("claim-banner")).not.toHaveAttribute("data-admin-only");
+  };
+  for (const [, label] of PAGES) { await userEvent.click(screen.getByRole("link", { name: label })); check(); }
+  await userEvent.click(screen.getByRole("button", { name: "Present" }));
+  expect(document.documentElement.dataset.present).toBe("1");
+  for (const [, label] of PAGES) { await userEvent.click(screen.getByRole("link", { name: label })); check(); }
+  expect(PAGES.map(([id]) => id)).toContain("gateway");
+});
+
 test("a skip link is the first tab stop, then the nav in order, then the toolbar; activating it focuses the main region", async () => {
   render(<App />);
   const user = userEvent.setup();

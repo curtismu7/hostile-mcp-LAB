@@ -1,0 +1,19 @@
+{
+  "status": "Ping claims (deck slides 36 and 37, paraphrased), UNVERIFIED on our tenant. Not our measurement.",
+  "rows": [
+    {
+      "slide": 36,
+      "feature": "MCP Gateway",
+      "challenge": "One shared token and every tool exposed to every caller: no attribution, no per-tool control, so security stalls adoption.",
+      "technical": "Per-user identity, per-tool policy and injected credentials on every call, fully audited.",
+      "business": "MCP integrations proceed under existing governance; faster time to value on agent projects."
+    },
+    {
+      "slide": 37,
+      "feature": "MCP Aggregate",
+      "challenge": "Each agent-server pair needs its own connection, config and credential, so effort and attack surface grow with each pair.",
+      "technical": "One connection, one policy cap enforced twice, one audit trail across members.",
+      "business": "New servers join by configuration, not project work: lower per-integration cost, faster rollout."
+    }
+  ]
+}

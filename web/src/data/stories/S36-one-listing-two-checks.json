@@ -1,0 +1,62 @@
+{
+  "id": "S36",
+  "title": "One listing, checked twice",
+  "goal": "{{lena}}'s assistant should see only the tools {{lena}} may use, from every server {{vocab.org}} connected, under names that cannot collide.",
+  "obstacle": "Without a gateway the assistant connects to each server on its own and takes every tool each one lists. A hostile server can reuse a trusted name, serve a tool that was not there at approval, or go quiet without anyone noticing. This is a Ping release claim (2026-11-02), UNVERIFIED on our tenant; it runs here only as a simulation.",
+  "control": "An aggregate gateway prefixes every tool with its member's alias, lists only what the caller is entitled to and the aggregate policy allows, and asks the same question again when a call is forwarded to a member. It does not read or clean what a tool says.",
+  "modes": ["gateway"],
+  "demos": ["D6"],
+  "steps": [
+    {
+      "n": 1,
+      "title": "No gateway: everything is listed",
+      "tell": "Connect straight to the bank and the hostile server. The assistant gets every tool from both, under bare names, and two of them are called get_balance. A server that is down is simply missing, and nothing says so.",
+      "say": "With no gateway the client does the merging, and the last definition of a name wins.",
+      "why": "The bank's tool and the hostile one look the same by name.",
+      "blocked": {
+        "tell": "Put the aggregate gateway in the path. Every tool now carries its member's alias, so the bank's get_balance and the hostile get_balance are two different names.",
+        "say": "The prefix is what keeps one server from taking another's name."
+      }
+    },
+    {
+      "n": 2,
+      "title": "Filter by what this caller may see",
+      "tell": "The gateway lists only the tools {{lena}}'s assistant is entitled to. The viewer, entitled to fewer, gets fewer. The demo audit pane on the page, an administrator's view that the caller never sees, shows what was hidden and why.",
+      "say": "The listing is different for every caller, because it is filtered by who is asking.",
+      "why": "A tool the caller cannot see is a tool a hostile description cannot talk the model into using."
+    },
+    {
+      "n": 3,
+      "title": "Cap what the aggregate allows",
+      "tell": "A tool the caller is entitled to is still hidden when the aggregate policy does not allow it. Take the cap off and it appears; put it back and it goes.",
+      "say": "The cap is the most anyone can ever see, whatever they were granted.",
+      "why": "One cap over every member is easier to reason about than a rule per server."
+    },
+    {
+      "n": 4,
+      "title": "A tool that appears after approval",
+      "tell": "The next morning the hostile server lists bulk_export, which was not there when {{mark}} approved. It is not entitled and not under the cap, so it is not listed and a call to it is told only: not available, the same words as for a tool that does not exist, before it reaches the server.",
+      "say": "A tool that shows up later is removed unless someone entitled it and capped it in.",
+      "why": "Approval was about a list. The gateway enforces that list again on every call."
+    },
+    {
+      "n": 5,
+      "title": "The filter does not clean content",
+      "tell": "The stock-price tool is entitled and under the cap, so the gateway lists it and its description is the poisoned one, word for word. Only the pinned client notices that it changed.",
+      "say": "The gateway decides who sees a tool. It does not read it.",
+      "why": "Overstating a control is how it gets trusted past what it can do."
+    },
+    {
+      "n": 6,
+      "title": "A member that is down is reported",
+      "tell": "Mark the hostile server unreachable. The gateway still answers, lists the bank's tools, and names the member it could not reach. A client with no gateway just never sees those tools.",
+      "say": "Missing and unreachable are not the same thing, and the gateway says which.",
+      "why": "A silent gap looks like a clean list."
+    }
+  ],
+  "proof": {
+    "happy": "No gateway: the page counts every tool the two servers list, shows get_balance defined twice, and the victim plans a transfer.",
+    "blocked": "With the gateway: the page counts what was listed, its demo audit pane counts what was hidden for this caller, the transfer is neither listed nor reachable (0 calls reach a member), and the pinned client still reports the changed stock-price tool."
+  },
+  "say": "One listing, one policy, checked when the list is made and again when the call is forwarded. It filters; it does not judge."
+}

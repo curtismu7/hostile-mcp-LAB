@@ -13,14 +13,40 @@
       "mcp",
       "tool-poisoning",
       "rug-pull",
-      "pinning"
+      "pinning",
+      "mcp-aggregate",
+      "unverified-release-claim"
     ]
   },
   "glossary": [
     {
+      "id": "aggregate-policy-cap",
+      "term": "Aggregate policy cap",
+      "definition": "A Ping release claim (2026-11-02), UNVERIFIED on our tenant: one policy limits the member tools, enforced on the listing and again at the member hop. The swagger has no field for it; this demo models it as a lab-invented allow-list.",
+      "aliases": [
+        "policy cap"
+      ]
+    },
+    {
+      "id": "alias-prefix",
+      "term": "Alias prefix",
+      "definition": "The alias__tool naming that keeps one member's tool from taking another member's name. An alias has no underscore, so the first double underscore always ends the alias.",
+      "aliases": [
+        "namespacing"
+      ]
+    },
+    {
       "id": "credential-harvest",
       "term": "Credential harvest",
       "definition": "A tool whose input schema asks for a password or one-time code as ordinary parameters, so the agent collects the secret from the user and hands it to the server."
+    },
+    {
+      "id": "entitlement-aware-discovery",
+      "term": "Entitlement-aware discovery",
+      "definition": "A Ping release claim (2026-11-02), UNVERIFIED on our tenant: the tool list a caller receives is filtered by what that caller is entitled to. The swagger has no field for it; this demo models it as a lab-invented allow-list.",
+      "aliases": [
+        "entitlement filter"
+      ]
     },
     {
       "id": "input-schema-exfil-sink",
@@ -29,6 +55,14 @@
       "aliases": [
         "exfiltration sink",
         "off-origin sink"
+      ]
+    },
+    {
+      "id": "mcp-aggregate",
+      "term": "MCP Aggregate",
+      "definition": "An application type (mcp-aggregate) that merges the tools of several member MCP servers behind one connection. Each member has an AppRef, an Alias and a ToolFilter, and its tools appear as Alias__tool. The field names are in the console swagger (2026-10-31, schema only).",
+      "aliases": [
+        "aggregate gateway"
       ]
     },
     {
@@ -109,6 +143,38 @@
       }
     },
     {
+      "id": "gateway",
+      "label": "Gateway: entitlement filter and cap",
+      "description": "The hostile server with no gateway and through an entitlement filter plus an aggregate policy cap, both simulated. A Ping release claim (2026-11-02), UNVERIFIED on our tenant; no live path.",
+      "group": "try-it",
+      "terms": [
+        "mcp-aggregate",
+        "entitlement-aware-discovery",
+        "aggregate-policy-cap",
+        "alias-prefix",
+        "tool-shadowing"
+      ],
+      "story": "S36",
+      "action": {
+        "type": "route",
+        "href": "/#/gateway"
+      }
+    },
+    {
+      "id": "gateway-why",
+      "label": "Why it matters: MCP Gateway and MCP Aggregate",
+      "description": "Challenge, technical and business value as Ping states them (slides 36 and 37). Ping claims, UNVERIFIED on our tenant, not our measurement.",
+      "group": "reference",
+      "terms": [
+        "mcp-aggregate"
+      ],
+      "story": "S36",
+      "action": {
+        "type": "route",
+        "href": "/#/gateway"
+      }
+    },
+    {
       "id": "limits",
       "label": "Honest limits",
       "description": "What pinning does not catch: a first-list poison it approved blindly, result injection, resources and prompts.",
@@ -158,6 +224,11 @@
       "id": "metadata-path",
       "label": "Where the tool metadata is consumed",
       "href": "/#/diagram"
+    },
+    {
+      "id": "gateway-checks",
+      "label": "Where the entitlement filter and the cap sit (simulation, UNVERIFIED)",
+      "href": "/#/gateway"
     }
   ],
   "stories": [
@@ -172,6 +243,19 @@
       "title": "The description told the agent to move money",
       "say": "A description can tell the agent to move money. Vet it before you approve it, and limit what the tool can do.",
       "file": "web/src/data/stories/S14-description-told-agent-to-move-money.json"
+    },
+    {
+      "id": "S36",
+      "title": "One listing, checked twice",
+      "say": "One listing, one policy, checked when the list is made and again when the call is forwarded. It filters; it does not judge.",
+      "file": "web/src/data/stories/S36-one-listing-two-checks.json"
+    }
+  ],
+  "documents": [
+    {
+      "id": "gateway-why-it-matters",
+      "path": "docs/gateway-why-it-matters.md",
+      "title": "Why it matters: MCP Gateway and MCP Aggregate (Ping claims, UNVERIFIED)"
     }
   ]
 }
