@@ -12,10 +12,15 @@
 // file's source text, so it must stay self-contained.
 //
 // Hostile input is bounded (LIMITS). Lookups use Map and Set, never an object indexed by a caller-supplied key.
-// A typed credential or token is never echoed: a refusal names a tool only when that tool is in the member's own
-// catalog, and no response carries call arguments.
+// A typed credential or token is never echoed: the caller's refusal names nothing, the demo audit log names a tool only
+// when that tool is in the member's own catalog, and no response carries call arguments. An alias is the one value typed
+// on purpose that comes back: it is a public label in every namespaced name (the swagger Alias field), never a secret.
+//
+// DEMO AUDIT. list().hidden and the per-member offered counts, and audit(), are the demo audit view: what an administrator
+// would see. A caller is meant to see list().tools and the reachable or unreachable status, and to be told only
+// not_available when a call is refused for a tool it was not shown or one that does not exist (lab reading).
 
-export const LIMITS = Object.freeze({ maxMembers: 8, maxToolsPerMember: 100, maxNameLength: 96, maxListEntries: 64 });
+export const LIMITS = Object.freeze({ maxMembers: 8, maxToolsPerMember: 100, maxNameLength: 96, maxListEntries: 64, maxAuditEntries: 256 });
 export const SEP = '__';
 export const TAGS = Object.freeze({
   swagger: 'console swagger name, 2026-10-31, schema only',
@@ -30,6 +35,7 @@ export const GATEWAY_LIMITS = Object.freeze([
   { id: 'policy-is-only-as-good-as-its-author', text: 'Entitlements and the cap are written by a person. A tool you entitled and capped in stays listed after its description is rug-pulled; pinning is what notices the change.' },
   { id: 'results-not-read', text: 'The gateway decides which tools are listed and callable. It does not read what a call returns, or resources and prompts.' },
   { id: 'no-live-path', text: 'Entitlement-aware discovery and the aggregate policy cap are Ping release claims (2026-11-02), UNVERIFIED on our tenant. The SE gateway is v1.261030 and does not have them, so this exists only as an in-process simulation.' },
+  { id: 'refusal-answer-is-a-reading', text: 'What a refused call returns is not in the release claim. This simulation answers not available for any tool that is hidden or missing, so a call cannot list what a caller was not shown; that is a lab reading. The reasons are in a labelled demo audit pane.' },
   { id: 'upstream-oauth-not-simulated', text: 'Per-user upstream OAuth to each member is not simulated: no token is issued, forwarded or shown here.' },
 ]);
 
@@ -67,6 +73,7 @@ export function createGateway({ registry, members, capAllow = null }) {
   }
 
   const hops = []; // every call forwarded to a member: { alias, tool }
+  const auditLog = []; // every call refused as not available: { name (null when no such tool), reason }; bounded
 
   // The one decision, asked twice: once when listing and once at the member hop. Order = ToolFilter, entitlement, cap.
   function decide(member, tool, entitled) {
@@ -110,23 +117,31 @@ export function createGateway({ registry, members, capAllow = null }) {
     };
   }
 
+  // The answer a caller gets when a call is refused. A tool that is hidden from this caller and a tool that does not exist
+  // get the very same answer, so a caller cannot use a call to find out what it was not shown. The reason goes to the demo
+  // audit log (audit() below), which a real gateway would show to an administrator and not to the caller (lab reading).
   function call(caller, name, args) {
     const entitled = entitledSet(caller);
-    const refuse = (code, stage, known = null) => ({ ok: false, code, stage, name: known });
+    const refuse = (code, stage) => ({ ok: false, code, stage });
+    const notAvailable = (reason, known) => {
+      if (auditLog.length < LIMITS.maxAuditEntries) auditLog.push({ name: known, reason });
+      return refuse('not_available', 'member-hop');
+    };
     if (typeof name !== 'string' || name.length === 0 || name.length > LIMITS.maxNameLength * 2) return refuse('bad_name', 'gateway');
     const at = name.indexOf(SEP);
     if (at < 1) return refuse('unprefixed', 'gateway');
     const member = byAlias.get(name.slice(0, at));
     if (!member) return refuse('unknown_alias', 'gateway');
+    // An unreachable member is reported in the listing, so saying so here reveals nothing new, whatever name was asked for.
+    if (!member.reachable) return refuse('member_unreachable', 'member-hop');
     const tool = name.slice(at + SEP.length);
     const real = member.tools.find((t) => t && t.name === tool);
-    if (!real) return refuse('no_such_tool', 'member-hop');
-    if (!member.reachable) return refuse('member_unreachable', 'member-hop', name);
+    if (!real) return notAvailable('no_such_tool', null);
     const reason = decide(member, tool, entitled);
-    if (reason) return refuse(reason, 'member-hop', name);
+    if (reason) return notAvailable(reason, name);
     hops.push({ alias: member.alias, tool });
     return { ok: true, code: 'forwarded', stage: 'member-hop', name, forwardedTo: member.alias, result: member.call ? member.call(tool, args) : null };
   }
 
-  return { list, call, hops: () => hops.map((h) => ({ ...h })), aliases: () => [...byAlias.keys()] };
+  return { list, call, hops: () => hops.map((h) => ({ ...h })), audit: () => auditLog.map((a) => ({ ...a })), aliases: () => [...byAlias.keys()] };
 }

@@ -51,6 +51,9 @@ test('edited policy goes through the API: alias, entitlement, cap, filter and re
   assert.equal((await run({ toolFilter: { hostile: ['get_weather'] } })).count, 3);
   assert.deepEqual((await run({ reachable: { hostile: false } })).unreachable, ['hostile']);
   assert.equal((await run({ aliases: { hostile: 'ext' } })).count, 2);
+  const bankDown = await run({ reachable: { bank: false } });
+  assert.deepEqual([bankDown.unreachable, bankDown.count], [['bank'], 2]);
+  assert.equal((await run({ aliases: { bank: 'acct' }, entitled: ['acct__get_balance'], capAllow: null })).count, 1);
 }));
 
 test('bad requests get a 400 with a fixed message and nothing typed is echoed', () => withServer(async ({ post }) => {
@@ -83,6 +86,14 @@ test('a typed value never reaches a response field, the server log or an error',
       const ok = await (await post('/api/gateway/run', { policy: { entitled: [`bank__${SECRET}`, 'bank__get_balance'], capAllow: [`bank__${SECRET}`, 'bank__get_balance'] } })).text();
       assert.ok(!ok.includes(SECRET));
       assert.equal(JSON.parse(ok).policy.ignoredEntries, 2);
+      // a typed ToolFilter entry is not echoed either, in any field of the response
+      const filtered = await (await post('/api/gateway/run', { policy: { toolFilter: { bank: [`sk-live-${SECRET}`, 'get_balance'], hostile: [`nonexistent_${SECRET}`] } } })).text();
+      assert.ok(!filtered.includes(SECRET));
+      assert.equal(JSON.parse(filtered).policy.ignoredEntries, 2);
+      assert.deepEqual(JSON.parse(filtered).members.map((m) => m.toolFilter), [['get_balance'], []]);
+      // a refused call tells the caller one thing, whether the tool is hidden or missing; the reason is the audit field
+      const attempts = JSON.parse(await (await post('/api/gateway/run', {})).text()).gateway.attempts;
+      assert.ok(attempts.filter((a) => a.code === 'not_available').every((a) => !Object.hasOwn(a, 'name') || typeof a.auditReason === 'string'));
       for (const b of [{ policy: { entitled: [`${SECRET} !`] } }, { caller: SECRET }]) assert.ok(!(await (await post('/api/gateway/run', b)).text()).includes(SECRET));
     });
   } finally { Object.assign(console, real); }

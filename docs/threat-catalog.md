@@ -141,4 +141,5 @@ Subject: prompt `account_review`. Hides in: prompt.
 - Entitlements and the cap are written by a person. A tool you entitled and capped in stays listed after its description is rug-pulled; pinning is what notices the change.
 - The gateway decides which tools are listed and callable. It does not read what a call returns, or resources and prompts.
 - Entitlement-aware discovery and the aggregate policy cap are Ping release claims (2026-11-02), UNVERIFIED on our tenant. The SE gateway is v1.261030 and does not have them, so this exists only as an in-process simulation.
+- What a refused call returns is not in the release claim. This simulation answers not available for any tool that is hidden or missing, so a call cannot list what a caller was not shown; that is a lab reading. The reasons are in a labelled demo audit pane.
 - Per-user upstream OAuth to each member is not simulated: no token is issued, forwarded or shown here.

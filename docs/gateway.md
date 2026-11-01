@@ -13,6 +13,10 @@ The hostile server seen two ways, with the same caller and the same task:
 
 Story S36 ("One listing, checked twice", ID provisional) is on the Gateway tab with the Allowed/Blocked switch. The Challenge, Technical and Business lines for slides 36 and 37 are on the tab and in [gateway-why-it-matters.md](gateway-why-it-matters.md), labelled as Ping claims. Present mode keeps the banner.
 
+## Demo audit pane
+
+A real gateway would show an administrator which tools it hid and why. The Gateway tab shows that too, so the demo can explain itself, but it is labelled **Demo audit pane** and kept apart from what the caller gets. The hidden count, the per-server offered counts, the reason for each refused probe call and the Outcome column of the policy table are the audit view. The caller sees the listed tools, whether each server is reachable, and, for a refused call, only `not available`: the same answer for a tool that is hidden by entitlement, hidden by the cap, outside the ToolFilter or does not exist, so a call cannot be used to enumerate what the caller was not shown. That uniform answer is a lab reading; the release claim does not say what a refused call returns. A call to an unreachable server gets `member unreachable`, because the listing already reports it.
+
 ## Where every statement comes from
 
 | Statement | Tag |
@@ -31,14 +35,16 @@ Identity wording: Federated Identity is a display name. The API object is still 
 
 ## Code
 
-- `server/src/gateway.js`: the pure model (about 140 lines, no imports). `createGateway({ registry, members, capAllow })` returns `list`, `call`, `hops`, `aliases`.
+- `server/src/gateway.js`: the pure model (about 140 lines, no imports). `createGateway({ registry, members, capAllow })` returns `list`, `call`, `hops`, `audit`, `aliases`.
 - `server/src/gateway-scenario.js`: request validation (`parseRequest`), the run (`runGateway`), `defaultPolicy`, the config the page loads.
 - `server/src/gateway-fixtures.js`: callers, cap, simulated tools, the fixed task list.
-- API: `GET /api/gateway/config`, `POST /api/gateway/run` with `{ stage, caller, task, policy }`. Unknown fields, a typed value that matches no tool, and a free-text task are refused or ignored without being echoed.
+- API: `GET /api/gateway/config`, `POST /api/gateway/run` with `{ stage, caller, task, policy }`. Unknown fields, a typed value that matches no tool (in the entitlement list, the cap list or a ToolFilter), and a free-text task are refused or ignored without being echoed; ignored entries are counted. An alias is the one typed value that comes back, because it is a public label in every tool name (the swagger `Alias` field): it is limited to 24 characters of a-z, 0-9 and dash, and the page says never to type a secret into it.
 
 ## Tests
 
 - `server/test/gateway-checks.js`: the named checks (one or more per row of the feature test plan, each with a negative control) and the scenario checks (one per editable policy field).
-- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 32 mutated copies of the source and requires a named check to fail for each one.
+- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 46 mutated copies of the source, one per member for each per-member field and requires a named check to fail for each one.
 - `server/test/gateway-api.test.js`: HTTP, no echo of typed values, zero outbound attempts under the network guard, hosted-mock behaviour.
-- `web/src/pages/Gateway.test.jsx`: the page driven by the real engine, every editable field, Reset, Simulate.
+- `web/src/pages/Gateway.test.jsx`: the page driven by the real engine, every editable field (including each Cap allows checkbox), the demo audit pane, Reset, Simulate.
+- `web/src/pages/GatewayDiagram.test.jsx`: a drag is kept per view and Reset restores the boxes (ReactFlow is replaced by a stand-in, because jsdom cannot drag).
+- `scripts/web-mutation.mjs`: 19 mutants of the page and the diagram, each of which must fail a page test. `scripts/e2e.mjs` drags a real box and presses Reset in Chromium.
