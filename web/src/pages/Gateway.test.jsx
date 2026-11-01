@@ -289,6 +289,88 @@ test("Reset puts the policy, the list, the caller and the walk back", async () =
   expect(screen.getByTestId("gw-caption")).toHaveTextContent("Press Simulate");
 });
 
+test("Reset restores every editable field: ToolFilter text, Reachable, the cap list and switch, the entitlements, the task", async () => {
+  render(<Gateway />);
+  await ready();
+  const baseline = posts.at(-1);
+  const bankGroup = () => within(screen.getByRole("group", { name: /Server: bank/ }));
+  const hostileGroup = () => within(screen.getByRole("group", { name: /Server: hostile/ }));
+  const settled = async (want) => { await waitFor(() => expect(screen.getByTestId("gw-state")).toHaveTextContent("Up to date")); await waitFor(() => expect(count("gw-gateway-count")).toBe(want)); };
+
+  // change every editable field away from its default
+  await userEvent.type(screen.getByLabelText("ToolFilter for bank"), "get_balance");
+  await userEvent.type(screen.getByLabelText("ToolFilter for hostile"), "get_weather,get_stock_price");
+  await userEvent.click(bankGroup().getByRole("checkbox"));
+  await userEvent.click(hostileGroup().getByRole("checkbox"));
+  await userEvent.click(box("Cap allows: hostile__send_email"));
+  await userEvent.click(box("Cap allows: bank__get_statement"));
+  await userEvent.click(box("Entitled: hostile__send_email"));
+  await userEvent.selectOptions(screen.getByLabelText("Task"), "What is the stock price of ACME?");
+  await userEvent.click(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ }));
+  await waitFor(() => expect(posts.at(-1).policy.capAllow).toBeNull());
+  await settled(0);
+  const edited = posts.at(-1);
+  expect(edited.policy.toolFilter).toEqual({ bank: ["get_balance"], hostile: ["get_weather", "get_stock_price"] });
+  expect(edited.policy.reachable).toEqual({ bank: false, hostile: false });
+  expect(edited.task).toBe("What is the stock price of ACME?");
+  expect(screen.getByLabelText("Task")).toHaveValue("3");
+  expect(bankGroup().getByRole("checkbox")).not.toBeChecked();
+  expect(box("Cap allows: bank__get_statement")).toBeDisabled();
+
+  await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+  await waitFor(() => expect(posts.at(-1)).toEqual(baseline));
+  await settled(4);
+
+  // the fields, as the person sees them
+  expect(screen.getByLabelText("ToolFilter for bank")).toHaveValue("");
+  expect(screen.getByLabelText("ToolFilter for hostile")).toHaveValue("");
+  expect(bankGroup().getByRole("checkbox")).toBeChecked();
+  expect(hostileGroup().getByRole("checkbox")).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ })).toBeChecked();
+  expect(screen.getByLabelText("Task")).toHaveValue("2");
+  for (const name of ["bank__get_balance", "bank__get_statement", "hostile__get_weather", "hostile__get_stock_price", "hostile__search_docs"]) {
+    expect(box(`Cap allows: ${name}`)).toBeChecked();
+    expect(box(`Cap allows: ${name}`)).toBeEnabled();
+  }
+  expect(box("Cap allows: hostile__send_email")).not.toBeChecked();
+  expect(box("Entitled: hostile__send_email")).toBeChecked();
+  expect(box("Entitled: hostile__search_docs")).not.toBeChecked();
+  // and what was sent: the default request, field for field
+  expect(posts.at(-1).policy.toolFilter).toEqual({ bank: null, hostile: null });
+  expect(posts.at(-1).policy.reachable).toEqual({ bank: true, hostile: true });
+  expect(posts.at(-1).policy.capAllow).toEqual(["bank__get_balance", "bank__get_statement", "hostile__get_weather", "hostile__get_stock_price", "hostile__search_docs"]);
+  expect(posts.at(-1).policy.entitled).toEqual(["bank__get_balance", "bank__get_statement", "hostile__get_weather", "hostile__get_stock_price", "hostile__send_email"]);
+  expect(screen.getByTestId("gw-member-bank")).toHaveTextContent("reachable");
+  expect(screen.getByTestId("gw-member-hostile")).toHaveTextContent("reachable");
+  expect(screen.queryByTestId("gw-silent")).toBeNull();
+});
+
+test("a comma separated ToolFilter entry is split into names, whitespace and empty parts dropped; each name limits the member", async () => {
+  render(<Gateway />);
+  await ready();
+  const input = screen.getByLabelText("ToolFilter for hostile");
+  await userEvent.type(input, "get_weather,get_stock_price");
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toEqual(["get_weather", "get_stock_price"]));
+  await waitFor(() => expect(screen.getByTestId("gw-state")).toHaveTextContent("Up to date"));
+  expect(count("gw-gateway-count")).toBe(4);
+  expect(screen.getByTestId("gw-ignored")).toHaveTextContent(/^0 policy entries/);
+  // spaces around the names, empty parts and a trailing comma change nothing
+  await userEvent.clear(input);
+  await userEvent.type(input, " get_weather , ,, get_stock_price ,");
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toEqual(["get_weather", "get_stock_price"]));
+  await userEvent.clear(input);
+  await userEvent.type(input, "get_weather,send_email");
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toEqual(["get_weather", "send_email"]));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
+  expect(within(screen.getByTestId("gw-policy")).getByText("hostile__get_stock_price").closest("tr")).toHaveTextContent("hidden: outside ToolFilter");
+  expect(within(screen.getByTestId("gw-policy")).getByText("hostile__send_email").closest("tr")).toHaveTextContent("hidden: over the cap");
+  // only commas and spaces: no filter at all
+  await userEvent.clear(input);
+  await userEvent.type(input, " , ,");
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toBeNull());
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+});
+
 test("Simulate walks the gateway view with the measured numbers, and Reset clears the walk", async () => {
   render(<Gateway />);
   await ready();

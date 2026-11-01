@@ -529,7 +529,8 @@ export const SCENARIO_CHECKS = [
       const r = await run(mod, { policy: { entitled: [...CALLERS.analyst.entitled, typed], capAllow: [...DEFAULT_CAP, typed] } });
       assert.ok(!JSON.stringify(r).includes(SECRET));
       assert.equal(r.policy.ignoredEntries, 2);
-      assert.equal(r.policy.entitled.length, 5);
+      // the entitlement list and the cap list are not echoed at all, matching names included: a name the cap hides is a name the caller was not shown
+      assert.deepEqual(Object.keys(r.policy), ['ignoredEntries']);
       // a typed ToolFilter entry is held to the same rule: only names the member really has come back, the rest are counted
       const filtered = await run(mod, { policy: { toolFilter: { bank: [`${SECRET}-bank`, 'get_balance'], hostile: ['get_weather', `sk-live-${SECRET}`, 'nonexistent_tool_x'] } } });
       assert.ok(!JSON.stringify(filtered).includes(SECRET), 'no response field carries a typed ToolFilter entry');
@@ -612,6 +613,29 @@ export const SCENARIO_CHECKS = [
         assert.ok(audit.hidden.some((h) => h.name === name));
         assert.ok(!callerSide.tools.some((t) => t.name === name));
       }
+    },
+  },
+  {
+    id: 'scenario-no-policy-echo-outside-audit', row: 'entitlement and cap names that match real tools are not echoed outside the demo audit view',
+    async run(mod) {
+      const r = await run(mod, { stage: 'later', caller: 'analyst' });
+      assert.deepEqual(Object.keys(r.policy), ['ignoredEntries']);
+      // analyst is entitled to hostile__send_email and the default cap allows hostile__search_docs; the listing shows neither
+      assert.ok(CALLERS.analyst.entitled.includes('hostile__send_email') && DEFAULT_CAP.includes('hostile__search_docs'));
+      assert.ok(!listOf(r).includes('hostile__send_email') && !listOf(r).includes('hostile__search_docs'));
+      const { audit, ...callerSide } = r.gateway;
+      const outside = JSON.stringify({ ...r, direct: null, gateway: callerSide });
+      for (const hiddenName of ['hostile__send_email', 'hostile__search_docs']) assert.ok(!outside.includes(hiddenName), `${hiddenName} appears only inside gateway.audit`);
+      assert.ok(audit.hidden.some((h) => h.name === 'hostile__send_email' && h.reason === 'over-cap'), 'the administrator view does say it');
+      assert.ok(audit.hidden.some((h) => h.name === 'hostile__search_docs' && h.reason === 'not-entitled'));
+      // negative control: the names the caller is shown are still in the answer
+      assert.ok(outside.includes('bank__get_balance'));
+      // a wide entitlement list under a one-name cap: still no entitlement or cap list in the answer, only the listing it produced
+      const wide = await run(mod, { policy: { entitled: Object.values(CALLERS).flatMap((c) => c.entitled), capAllow: ['bank__get_balance', 'hostile__get_weather_alerts'] } });
+      assert.deepEqual(Object.keys(wide.policy), ['ignoredEntries']);
+      const { audit: wideAudit, ...wideSide } = wide.gateway;
+      assert.ok(!JSON.stringify({ ...wide, direct: null, gateway: wideSide }).includes('hostile__send_email'));
+      assert.ok(wideAudit.hidden.some((h) => h.name === 'hostile__send_email'));
     },
   },
 ];

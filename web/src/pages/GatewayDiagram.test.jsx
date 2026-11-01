@@ -10,8 +10,8 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    ReactFlow: ({ nodes, onNodesChange, children }) => (
-      <div data-testid="rf">
+    ReactFlow: ({ nodes, onNodesChange, children, autoPanOnNodeDrag }) => (
+      <div data-testid="rf" data-autopan={String(autoPanOnNodeDrag)}>
         {nodes.map((n) => <div key={n.id} data-testid={`node-${n.id}`} data-x={n.position.x} data-y={n.position.y}>{n.data.title}</div>)}
         <button type="button" onClick={() => onNodesChange([{ type: "position", id: nodes.some((n) => n.id === "gw") ? "gw" : "caller", position: { x: 111, y: 222 }, dragging: false }])}>drag a box</button>
         {children}
@@ -54,4 +54,9 @@ test("each view keeps its own drag, and Reset restores both views", async () => 
   expect(at("gw")).toEqual([330, 110]);
   await userEvent.selectOptions(screen.getByLabelText("View"), "direct");
   expect(at("caller")).toEqual([330, 110]);
+});
+
+test("dragging a box does not pan the view: the canvas is told not to autopan, so a drag near the edge cannot push a label out of view", () => {
+  render(<Harness />);
+  expect(screen.getByTestId("rf").dataset.autopan).toBe("false");
 });
