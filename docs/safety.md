@@ -12,6 +12,8 @@ This repo holds hostile content on purpose, so it is built to be inert. Each rul
 | Untrusted strings (descriptions, results, diffs) render as inert text in the UI. | `web/src/test/inert.test.jsx`: a script or `onerror` payload renders as text in every place the pages show untrusted text. |
 | No real credentials anywhere. | `.githooks/pre-commit` and the CI `secrets` job run gitleaks. The only secret-shaped inputs are the demo's fake `external-001` account and the payload text itself. |
 | The container publishes its port on loopback only. | `docker-compose.yml` publishes `127.0.0.1:${HOST_PORT}:4701`. This is a compose setting, not a unit test; the check was a live one (see the README, "Docker"). |
+| The gateway simulation makes no outbound request. | `server/test/gateway-api.test.js` runs every caller, both lists, edited policies and refusals under the network guard and asserts zero attempts; the source scan in `safety.test.js` and a named check cover `gateway*.js`. |
+| Hostile gateway input is bounded and never echoed. | `gateway-checks.js` (bounded, never echoed) and `gateway-api.test.js` (400 with a fixed message, nothing typed repeated in a body or a log). Lookups use Map and Set, never an object indexed by a typed key. |
 
 ## The one opt-in
 
