@@ -62,6 +62,8 @@ test("changing the caller changes the listing; negative control: the other calle
   await ready();
   await userEvent.selectOptions(screen.getByLabelText("Caller"), "viewer");
   await waitFor(() => expect(count("gw-gateway-count")).toBe(2));
+  expect(posts.at(-1).caller).toBe("viewer");
+  expect(posts.at(-1).policy.entitled).toEqual(["bank__get_balance", "hostile__get_stock_price"]);
   expect(count("gw-direct-count")).toBe(15);
   await userEvent.selectOptions(screen.getByLabelText("Caller"), "analyst");
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
@@ -101,6 +103,16 @@ test("each editable field changes the answer: entitlement, cap, alias, ToolFilte
 
   await userEvent.selectOptions(screen.getByLabelText("When"), "first");
   await waitFor(() => expect(screen.queryByTestId("gw-pin")).toBeNull());
+});
+
+test("the task selects what the victim does, on both sides", async () => {
+  render(<Gateway />);
+  await ready();
+  expect(screen.getByTestId("gw-gateway-victim")).toHaveTextContent("bank__get_balance");
+  await userEvent.selectOptions(screen.getByLabelText("Task"), "What is the stock price of ACME?");
+  await waitFor(() => expect(screen.getByTestId("gw-gateway-victim")).toHaveTextContent("hostile__get_stock_price"));
+  expect(posts.at(-1).task).toBe("What is the stock price of ACME?");
+  expect(screen.getByTestId("gw-direct-victim")).toHaveTextContent("get_stock_price");
 });
 
 test("a bad alias is refused with a fixed message, the last good answer stays, and nothing typed is echoed", async () => {
