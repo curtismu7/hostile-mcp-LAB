@@ -39,6 +39,6 @@ Identity wording: Federated Identity is a display name. The API object is still 
 ## Tests
 
 - `server/test/gateway-checks.js`: the named checks (one or more per row of the feature test plan, each with a negative control) and the scenario checks (one per editable policy field).
-- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 33 mutated copies of the source and requires a named check to fail for each one.
+- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 32 mutated copies of the source and requires a named check to fail for each one.
 - `server/test/gateway-api.test.js`: HTTP, no echo of typed values, zero outbound attempts under the network guard, hosted-mock behaviour.
 - `web/src/pages/Gateway.test.jsx`: the page driven by the real engine, every editable field, Reset, Simulate.
