@@ -20,6 +20,7 @@
     "doctor": "node scripts/doctor.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "e2e": "node scripts/e2e.mjs",
+    "mutation:web": "node scripts/web-mutation.mjs",
     "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs"
   },
   "devDependencies": {

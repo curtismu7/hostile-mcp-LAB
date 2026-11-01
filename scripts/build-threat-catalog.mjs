@@ -12,25 +12,27 @@ const WORD = { yes: 'Yes', partial: 'Partly', no: 'No' };
 
 export async function buildThreatCatalog() {
   const { catalog } = await import(pathToFileURL(path.join(ROOT, 'server/src/catalog.js')));
-  const { items, pinningCatches, pinningLimits } = catalog();
+  const { items, pinningCatches, pinningLimits, gatewayLimits } = catalog();
   const out = [
     '# Threat catalog',
     '',
     'Generated from `server/src/catalog.js` by `node scripts/build-threat-catalog.mjs`. Do not edit by hand; the same data is served at `GET /api/catalog`.',
     '',
-    '"Scanner" means a metadata scanner that reads tool descriptions and schemas at ingest. This repo ships none; the answers follow the source demo. "Pinning" is the pinned client in `server/src/pinning.js`.',
+    '"Scanner" means a metadata scanner that reads tool descriptions and schemas at ingest. This repo ships none; the answers follow the source demo. "Pinning" is the pinned client in `server/src/pinning.js`. "Gateway" is the entitlement-filtered aggregate gateway simulation in `server/src/gateway.js`: a lab reading of a Ping release claim (2026-11-02), UNVERIFIED on our tenant.',
     '',
-    '| Poison | Kind | Where it hides | Scanner | Pinning |',
-    '| --- | --- | --- | --- | --- |',
-    ...items.map((i) => `| \`${i.id}\` (\`${i.name}\`) | ${i.kind} | ${i.category} | ${WORD[i.scanner.catches]} | ${WORD[i.pinning.catches]} |`),
+    '| Poison | Kind | Where it hides | Scanner | Pinning | Gateway (UNVERIFIED) |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...items.map((i) => `| \`${i.id}\` (\`${i.name}\`) | ${i.kind} | ${i.category} | ${WORD[i.scanner.catches]} | ${WORD[i.pinning.catches]} | ${WORD[i.gateway.catches]} |`),
     '',
   ];
   for (const i of items) {
     out.push(`## \`${i.id}\``, '', `Subject: ${i.kind} \`${i.name}\`. Hides in: ${i.category}.`, '',
       `- What it does: ${i.what}`, `- How it lands: ${i.how}`,
-      `- Scanner (${WORD[i.scanner.catches]}): ${i.scanner.note}`, `- Pinning (${WORD[i.pinning.catches]}): ${i.pinning.note}`, '');
+      `- Scanner (${WORD[i.scanner.catches]}): ${i.scanner.note}`, `- Pinning (${WORD[i.pinning.catches]}): ${i.pinning.note}`,
+      `- Gateway, lab reading, UNVERIFIED (${WORD[i.gateway.catches]}): ${i.gateway.note}`, '');
   }
-  out.push('## What pinning catches', '', ...pinningCatches.map((c) => `- ${c.text}`), '', '## What pinning does not catch', '', ...pinningLimits.map((l) => `- ${l.text}`), '');
+  out.push('## What pinning catches', '', ...pinningCatches.map((c) => `- ${c.text}`), '', '## What pinning does not catch', '', ...pinningLimits.map((l) => `- ${l.text}`), '',
+    '## What the gateway simulation does not do', '', ...gatewayLimits.map((l) => `- ${l.text}`), '');
   return out.join('\n');
 }
 

@@ -4,6 +4,10 @@ A deliberately hostile MCP server, an offline victim that needs no model, and a 
 
 Nothing in the MCP protocol inspects tool metadata. The server serves the payloads and never scores or blocks. A defence can only sit where the metadata is consumed.
 
+## Release feature (simulated): entitlement filter and aggregate cap
+
+The Gateway tab shows the hostile server with no gateway and through an entitlement filter plus an aggregate policy cap, both simulated in process. It is a **Ping release claim (2026-11-02), UNVERIFIED on our tenant**: the SE gateway is v1.261030 and does not have it. The app has no Mock/Live toggle and runs offline only, so the feature has no live path until the release is on our tenant. A banner on every tab, in presenter mode too, says so. See [docs/gateway.md](docs/gateway.md) for the model, the tag on every statement (console swagger name, deck claim, lab-invented, lab reading) and the tests.
+
 ## Status
 
 Built and tested:
@@ -121,6 +125,8 @@ Drives the gallery, the side-by-side run (including the day-one limit: the poiso
 - [docs/architecture.md](docs/architecture.md): pieces, canonicalisation, verdicts, the two list counters.
 - [docs/safety.md](docs/safety.md): every safety rule and the test that enforces it.
 - [docs/limits.md](docs/limits.md): what pinning catches and does not.
+- [docs/gateway.md](docs/gateway.md): the entitlement filter and aggregate cap simulation, how each statement is tagged, the tests.
+- [docs/gateway-why-it-matters.md](docs/gateway-why-it-matters.md): Challenge, Technical and Business lines (Ping claims, UNVERIFIED).
 - [docs/threat-catalog.md](docs/threat-catalog.md): generated from the catalog data.
 - [docs/clients.md](docs/clients.md): pointing a real MCP client or the inspector at it; how the Privilege demo defends the call path while pinning defends the metadata path.
 - [CHANGELOG.md](CHANGELOG.md).
@@ -166,6 +172,8 @@ Does not catch: a poison already present when the tool was first approved (the a
 | `GET /api/catalog` | Each poison: what it does, how it lands, and whether a scanner and pinning catch it. |
 | `GET /api/victim-rules` | The victim rules and the pinning catch/limit lists. |
 | `POST /api/run-victim` | `{task, mode: 'ungoverned'\|'pinned', stage?: 'first'\|'later'}`. `later` (default) is the morning after, list #2. |
+| `GET /api/gateway/config` | The gateway tab's starting policy, callers, tasks, tags and the UNVERIFIED status. |
+| `POST /api/gateway/run` | `{stage?, caller?, task?, policy?}`: the no-gateway listing and the entitlement-filtered, capped listing side by side, probe calls, pin check. Every field is validated; nothing typed is echoed. |
 | `POST /api/mcp-session/new` | New in-memory MCP session against the real server, with its own list counter. |
 | `POST /api/mcp-session/:id/list` | tools/list. Returns the tools and, once approved, the pinned check. |
 | `POST /api/mcp-session/:id/approve` | Pin the last list. |
@@ -183,6 +191,8 @@ server/src/pinning.js     the pinned client
 server/src/victim.js      the offline victim
 server/src/session.js     in-memory MCP sessions
 server/src/scenario.js    the S05 run behind /api/run-victim
+server/src/gateway.js     the entitlement filter and aggregate cap simulation (pure)
+server/src/gateway-scenario.js  the run and the request validation behind /api/gateway/run
 server/tools/agent.mjs    optional real-model victim (needs LLM_URL)
 web/                      React + Vite UI
 content/terms.json        glossary source for the content pack

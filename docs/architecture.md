@@ -47,3 +47,12 @@ The MCP endpoints keep the source's behaviour: the rug-pull counter is process-w
 ## Where defences sit
 
 Nothing in the MCP protocol inspects tool metadata, so a defence can only sit where the metadata is consumed: in the client or a gateway in front of it. This server never scores or blocks, by design; if it did, the demo would show a defence that real hostile servers do not provide.
+
+## The gateway simulation (entitlement filter and aggregate cap)
+
+A Ping release claim (2026-11-02), UNVERIFIED on our tenant: the SE gateway is v1.261030 and does not have it, so this exists only as an in-process simulation. See [gateway.md](gateway.md) for the model, the tags and the tests.
+
+- `server/src/gateway.js` is pure and has no imports. Members carry `AppRef`, `Alias` and `ToolFilter` (console swagger names, 2026-10-31, schema only). `list(caller)` applies ToolFilter, then the caller's entitlements, then the aggregate cap, and prefixes every name `alias__tool`. `call(caller, name)` asks the same question again at the member hop before anything is forwarded.
+- `server/src/gateway-scenario.js` runs it against the real hostile server over the in-memory session, next to the no-gateway listing, and runs the pinned client on the gateway listing.
+- `server/src/gateway-fixtures.js` holds the callers, the cap list and three simulated tools. The real server does not serve them, so the golden wire test is untouched.
+- The Gateway tab (`web/src/pages/Gateway.jsx`, `GatewayDiagram.jsx`) is the only place the feature appears. The existing diagram page, whose text says there is no gateway, is unchanged.

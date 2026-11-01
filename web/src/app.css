@@ -143,3 +143,22 @@ main:focus { outline: none; }
 .wire__table td code { font-size: 0.75rem; }
 .wire__clients { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.75rem; font-size: 0.9rem; }
 @media (max-width: 40rem) { .wire__clients { grid-template-columns: 1fr; } }
+
+/* Gateway page and the release-claim banner. Tokens only: no colour literals here. */
+.claim-banner { padding: 0.5rem 1rem; background: var(--hold-wash); color: var(--hold); border-bottom: 2px solid var(--hold); font-size: 0.9rem; }
+.claim-banner strong { font-weight: 700; }
+.claim-tags { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; margin-left: 0.25rem; }
+.claim-tag { display: inline-block; padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+.gw__controls { margin-bottom: 1rem; }
+.gw__member { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; }
+.gw__member legend { font-weight: 600; }
+.gw__check { flex-direction: row; align-items: center; gap: 0.4rem; color: var(--text); }
+.gw__names { columns: 2; padding-left: 1.25rem; }
+.gw__members { list-style: none; padding: 0; margin: 0.4rem 0; display: grid; gap: 0.25rem; }
+.gw__table td, .gw__table th { padding: 0.35rem 0.5rem; }
+.gw__why { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.75rem; font-size: 0.9rem; }
+.gw__audit { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border: 1px dashed var(--border); border-radius: 8px; }
+.gw__claims { padding-left: 1.25rem; }
+.gw__claims li { margin: 0.4rem 0; }
+@media (max-width: 40rem) { .gw__why { grid-template-columns: 1fr; } .gw__names { columns: 1; } }
+.gw__diagram .react-flow__edge-text { font-size: 13px; }
