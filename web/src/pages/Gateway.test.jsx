@@ -12,15 +12,16 @@ import WHY from "../data/whyItMatters.json";
 
 const SECRET = "SECRET_TOKEN_123";
 let posts;
+let statuses;
 beforeEach(() => {
-  localStorage.clear(); window.location.hash = ""; posts = [];
+  localStorage.clear(); window.location.hash = ""; posts = []; statuses = [];
   vi.stubGlobal("fetch", vi.fn(async (url, init = {}) => {
     const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
     if (url === "/api/gateway/config") return json(200, gatewayConfigResponse());
     if (url === "/api/gateway/run") {
       const body = JSON.parse(init.body);
       posts.push(body);
-      try { return json(200, await runGateway(parseRequest(body))); } catch (e) { if (e instanceof PolicyError) return json(400, { message: e.message }); throw e; }
+      try { const out = await runGateway(parseRequest(body)); statuses.push(200); return json(200, out); } catch (e) { if (e instanceof PolicyError) { statuses.push(400); return json(400, { message: e.message }); } throw e; }
     }
     return json(404, { message: "no mock" });
   }));
@@ -52,6 +53,8 @@ test("the hidden list, the counts and the reasons sit in a labelled demo audit p
   await ready();
   const via = within(screen.getByTestId("gw-gateway"));
   const audit = within(screen.getByTestId("gw-audit"));
+  // the audit pane is its own section, not part of the caller's card
+  expect(screen.getByTestId("gw-gateway").contains(screen.getByTestId("gw-audit"))).toBe(false);
   expect(audit.getByRole("heading", { name: "Demo audit pane" })).toBeInTheDocument();
   expect(screen.getByTestId("gw-audit")).toHaveTextContent(/administrator's view/);
   expect(screen.getByTestId("gw-audit-hidden")).toHaveTextContent("11 tools hidden from this caller");
@@ -69,9 +72,15 @@ test("the hidden list, the counts and the reasons sit in a labelled demo audit p
   expect(table.queryByText(/not entitled|over the cap|outside ToolFilter/)).toBeNull();
   // the reasons are in the audit pane
   expect(within(screen.getByTestId("gw-audit-reasons")).getByText("hostile__create_transfer").closest("li")).toHaveTextContent("not entitled");
-  expect(via.getByTestId("gw-hops")).toHaveTextContent("2 of 6 calls reached a member");
+  expect(audit.getByTestId("gw-hops")).toHaveTextContent("2 of 6 calls reached a member");
+  expect(via.queryByTestId("gw-hops")).toBeNull();
+  // the whole caller card names no hidden tool and gives no reason or count of what it was not shown
+  const callerText = screen.getByTestId("gw-gateway").textContent;
+  for (const hiddenName of ["hostile__send_email", "hostile__search_docs", "hostile__get_weather_alerts"]) expect(callerText).not.toContain(hiddenName);
+  expect(callerText).not.toMatch(/hidden|not entitled|over the cap|outside ToolFilter|offered/);
   expect(screen.getByRole("columnheader", { name: "Outcome (demo audit view)" })).toBeInTheDocument();
-  expect(screen.getByText(/never type a secret into it/)).toBeInTheDocument();
+  expect(screen.getByText(/chosen from a fixed list/)).toBeInTheDocument();
+  expect(screen.queryByText(/never type a secret/)).toBeNull();
 });
 
 test("the entitled caller still receives the poisoned description, as inert text", async () => {
@@ -103,6 +112,11 @@ test("each editable field changes the answer: entitlement, cap, alias, ToolFilte
   await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
   await userEvent.click(box("Entitled: hostile__get_weather"));
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  await userEvent.click(box("Entitled: bank__get_statement"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
+  expect(posts.at(-1).policy.entitled).not.toContain("bank__get_statement");
+  await userEvent.click(box("Entitled: bank__get_statement"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
 
   await userEvent.click(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ }));
   await waitFor(() => expect(count("gw-gateway-count")).toBe(5));
@@ -114,19 +128,50 @@ test("each editable field changes the answer: entitlement, cap, alias, ToolFilte
   await userEvent.clear(screen.getByLabelText("ToolFilter for hostile"));
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
 
-  const aliasBox = screen.getByLabelText("Alias for hostile");
-  await userEvent.clear(aliasBox);
-  await userEvent.type(aliasBox, "ext");
+  const hostileAlias = screen.getByLabelText("Alias for hostile");
+  await userEvent.selectOptions(hostileAlias, "vendor");
   await waitFor(() => expect(count("gw-gateway-count")).toBe(2));
   expect(screen.getByTestId("gw-ignored")).toHaveTextContent(/[1-9]\d* policy entries match no tool/);
-  await userEvent.clear(aliasBox);
-  await userEvent.type(aliasBox, "hostile");
+  expect(posts.at(-1).policy.aliases).toEqual({ bank: "bank", hostile: "vendor" });
+  await userEvent.selectOptions(hostileAlias, "hostile");
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
 
   await userEvent.click(within(screen.getByRole("group", { name: /Server: hostile/ })).getByRole("checkbox"));
   await waitFor(() => expect(screen.getByTestId("gw-member-hostile")).toHaveTextContent("unreachable: reported, not dropped"));
   expect(screen.getByTestId("gw-silent")).toHaveTextContent("hostile");
   expect(count("gw-direct-count")).toBe(2);
+  expect(posts.at(-1).policy.reachable).toEqual({ bank: true, hostile: false });
+  await userEvent.click(within(screen.getByRole("group", { name: /Server: hostile/ })).getByRole("checkbox"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+
+  // the bank is an editable member too: every field of it must change the answer, not be ignored
+  const bankAlias = screen.getByLabelText("Alias for bank");
+  await userEvent.selectOptions(bankAlias, "ledger");
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(2));
+  expect(posts.at(-1).policy.aliases).toEqual({ bank: "ledger", hostile: "hostile" });
+  expect(screen.getByTestId("gw-policy")).toHaveTextContent("ledger__get_balance");
+  await userEvent.selectOptions(bankAlias, "bank");
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+
+  await userEvent.type(screen.getByLabelText("ToolFilter for bank"), "get_balance");
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
+  expect(posts.at(-1).policy.toolFilter.bank).toEqual(["get_balance"]);
+  expect(within(screen.getByTestId("gw-policy")).getByText("bank__get_statement").closest("tr")).toHaveTextContent("hidden: outside ToolFilter");
+  await userEvent.clear(screen.getByLabelText("ToolFilter for bank"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  expect(posts.at(-1).policy.toolFilter.bank).toBeNull();
+
+  const bankUp = within(screen.getByRole("group", { name: /Server: bank/ })).getByRole("checkbox");
+  await userEvent.click(bankUp);
+  await waitFor(() => expect(screen.getByTestId("gw-member-bank")).toHaveTextContent("unreachable: reported, not dropped"));
+  expect(screen.getByTestId("gw-silent")).toHaveTextContent("bank");
+  expect(count("gw-gateway-count")).toBe(2);
+  expect(count("gw-direct-count")).toBe(13);
+  expect(posts.at(-1).policy.reachable).toEqual({ bank: false, hostile: true });
+  expect(bankUp).not.toBeChecked();
+  await userEvent.click(bankUp);
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  expect(bankUp).toBeChecked();
 
   await userEvent.selectOptions(screen.getByLabelText("When"), "first");
   await waitFor(() => expect(screen.queryByTestId("gw-pin")).toBeNull());
@@ -156,6 +201,13 @@ test("the Cap allows checkboxes edit the cap list that is sent, and the listing 
   await waitFor(() => expect(count("gw-gateway-count")).toBe(5));
   expect(posts.at(-1).policy.capAllow).toContain("hostile__send_email");
   expect(posts.at(-1).policy.capAllow).toHaveLength(6);
+  // the bank's rows are editable too
+  await userEvent.click(box("Cap allows: bank__get_statement"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  expect(posts.at(-1).policy.capAllow).not.toContain("bank__get_statement");
+  await userEvent.click(box("Cap allows: bank__get_statement"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(5));
+  expect(posts.at(-1).policy.capAllow).toContain("bank__get_statement");
   // the cap list is only editable while the cap is on, and off sends no cap at all
   await userEvent.click(screen.getByRole("checkbox", { name: /Aggregate policy cap on/ }));
   await waitFor(() => expect(posts.at(-1).policy.capAllow).toBeNull());
@@ -175,17 +227,47 @@ test("the task selects what the victim does, on both sides", async () => {
   expect(screen.getByTestId("gw-direct-victim")).toHaveTextContent("get_stock_price");
 });
 
-test("a bad alias is refused with a fixed message, the last good answer stays, and nothing typed is echoed", async () => {
+test("an alias is a select over the fixed list: no free text, no invalid state is ever posted, and a taken choice is disabled", async () => {
   render(<Gateway />);
   await ready();
-  const aliasBox = screen.getByLabelText("Alias for bank");
-  await userEvent.clear(aliasBox);
-  await userEvent.type(aliasBox, "A__b");
-  const alert = await screen.findByTestId("gw-error");
-  expect(alert).toHaveTextContent(/alias is 1 to 24 characters/);
-  expect(alert.textContent).not.toContain("A__b");
-  expect(count("gw-gateway-count")).toBe(4);
-  expect(JSON.stringify(posts)).not.toContain(SECRET);
+  for (const who of ["bank", "hostile"]) {
+    const sel = screen.getByLabelText(`Alias for ${who}`);
+    expect(sel.tagName).toBe("SELECT");
+    expect(within(sel).getAllByRole("option").map((o) => o.value)).toEqual(["hostile", "bank", "vendor", "ledger", "files", "mail"]);
+  }
+  // the other member's alias cannot be picked, so two members never share one
+  const bankSel = screen.getByLabelText("Alias for bank");
+  expect(within(bankSel).getByRole("option", { name: "hostile" })).toBeDisabled();
+  expect(within(bankSel).getByRole("option", { name: "vendor" })).toBeEnabled();
+  await userEvent.selectOptions(bankSel, "hostile");
+  expect(bankSel).toHaveValue("bank");
+  for (const alias of ["vendor", "files", "mail", "ledger"]) {
+    await userEvent.selectOptions(bankSel, alias);
+    await waitFor(() => expect(screen.getByLabelText("Alias for hostile")).toHaveValue("hostile"));
+  }
+  await waitFor(() => expect(posts.at(-1).policy.aliases.bank).toBe("ledger"));
+  // the aliases chosen on one member are disabled on the other, both ways
+  expect(within(screen.getByLabelText("Alias for hostile")).getByRole("option", { name: "ledger" })).toBeDisabled();
+  expect(within(bankSel).getByRole("option", { name: "bank" })).toBeEnabled();
+  await waitFor(() => expect(screen.getByTestId("gw-state")).toHaveTextContent("Up to date"));
+  expect(screen.queryByTestId("gw-error")).toBeNull();
+  expect(statuses.length).toBeGreaterThan(0);
+  expect(statuses.every((s) => s === 200)).toBe(true);
+  expect(posts.every((p) => ["hostile", "bank", "vendor", "ledger", "files", "mail"].includes(p.policy.aliases.bank) && ["hostile", "bank", "vendor", "ledger", "files", "mail"].includes(p.policy.aliases.hostile))).toBe(true);
+  expect(new Set(posts.map((p) => `${p.policy.aliases.bank}/${p.policy.aliases.hostile}`)).has("hostile/hostile")).toBe(false);
+});
+
+test("a token-shaped ToolFilter entry is never echoed by the page; the page counts it", async () => {
+  const { container } = render(<Gateway />);
+  await ready();
+  const leak = "ghp-aliasleak1234abcd";
+  await userEvent.type(screen.getByLabelText("ToolFilter for hostile"), leak);
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toEqual([leak]));
+  await waitFor(() => expect(screen.getByTestId("gw-state")).toHaveTextContent("Up to date"));
+  expect(screen.getByTestId("gw-ignored")).toHaveTextContent(/[1-9]\d* policy entries match no tool/);
+  expect(container.textContent).not.toContain(leak);
+  expect(JSON.stringify(await runGateway(parseRequest(posts.at(-1))))).not.toContain(leak);
+  expect(JSON.stringify(posts.map((p) => p.policy.aliases))).not.toContain(leak);
 });
 
 test("Reset puts the policy, the list, the caller and the walk back", async () => {
@@ -195,12 +277,15 @@ test("Reset puts the policy, the list, the caller and the walk back", async () =
   await userEvent.click(box("Entitled: bank__get_balance"));
   await userEvent.selectOptions(screen.getByLabelText("When"), "first");
   await waitFor(() => expect(count("gw-gateway-count")).toBe(1));
+  await userEvent.selectOptions(screen.getByLabelText("Alias for bank"), "mail");
+  await waitFor(() => expect(posts.at(-1).policy.aliases.bank).toBe("mail"));
   await userEvent.click(screen.getByRole("button", { name: "Reset" }));
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
   expect(screen.getByLabelText("Caller")).toHaveValue("analyst");
   expect(screen.getByLabelText("When")).toHaveValue("later");
   expect(count("gw-direct-count")).toBe(15);
   expect(screen.getByLabelText("Alias for hostile")).toHaveValue("hostile");
+  expect(screen.getByLabelText("Alias for bank")).toHaveValue("bank");
   expect(screen.getByTestId("gw-caption")).toHaveTextContent("Press Simulate");
 });
 

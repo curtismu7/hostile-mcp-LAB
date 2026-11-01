@@ -20,6 +20,7 @@ export const CLAIMS = [
   { id: "toolfilter", text: "ToolFilter limits a member to the tools it names; empty means no limit. The schema gives only the type (a list of strings).", tags: ["reading"] },
   { id: "registry", text: "An aggregate member must be an application the tenant already knows; an unknown AppRef is refused.", tags: ["reading"] },
   { id: "alias-rule", text: "An alias has no underscore, so the first double underscore in a name always ends the alias. A tool a member calls bank__get_balance is listed as hostile__bank__get_balance.", tags: ["invented"] },
+  { id: "alias-presets", text: "The page offers six fixed aliases (hostile, bank, vendor, ledger, files, mail) in a select. The Alias field exists in the schema; the list of choices is ours, so nothing typed can end up in a tool name.", tags: ["invented"] },
   { id: "callers", text: "The callers (analyst, viewer), their entitlement lists, the cap list, and the three simulated tools (get_statement, bulk_export, bank__get_balance) are fixtures made for this page. The real hostile server does not serve those three.", tags: ["invented"] },
   { id: "identity", text: "Federated Identity is the display name for what the API still calls NonHumanIdentity. This page shows no identity objects; callers are plain labels.", tags: ["swagger"] },
   { id: "no-live", text: "The SE gateway is v1.261030 and does not have this release, so there is no live path. This page is an in-process simulation only. Per-user upstream OAuth to members is not simulated.", tags: ["reading"] },

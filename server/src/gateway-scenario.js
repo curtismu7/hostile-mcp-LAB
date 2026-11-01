@@ -9,7 +9,7 @@
 // are the real clean and rug-pulled answers. Pinning (pinning.js) runs on the gateway listing to show the filter does
 // not replace it. No network, no clock, no randomness. Every Ping product claim here is UNVERIFIED on our tenant.
 import { createGateway, GatewayConfigError, SEP, TAGS } from './gateway.js';
-import { APP_REFS, CALLERS, DEFAULT_ALIASES, DEFAULT_CAP, MEMBER_KEYS, REGISTRY, TASKS, hostileCatalog, memberTools } from './gateway-fixtures.js';
+import { ALIAS_PRESETS, APP_REFS, CALLERS, DEFAULT_ALIASES, DEFAULT_CAP, MEMBER_KEYS, REGISTRY, TASKS, hostileCatalog, memberTools } from './gateway-fixtures.js';
 import { createPinnedClient } from './pinning.js';
 import { BANK_ORIGIN, HOSTILE_ORIGIN, createSession } from './session.js';
 import { runVictim } from './victim.js';
@@ -19,7 +19,6 @@ const STAGES = ['first', 'later'];
 const MAX_ENTRIES = 64;
 const MAX_NAME = 96;
 const NAME = /^[A-Za-z0-9_.-]{1,96}$/;
-const ALIAS = /^[a-z][a-z0-9-]{0,23}$/;
 
 export class PolicyError extends Error {
   constructor(message) { super(message); this.name = 'PolicyError'; }
@@ -60,7 +59,7 @@ export function parseRequest(body) {
   if (top.has('policy')) {
     const p = pick(top.get('policy'), ['aliases', 'toolFilter', 'reachable', 'entitled', 'capAllow'], 'policy');
     if (p.has('aliases')) for (const [k, v] of pick(p.get('aliases'), MEMBER_KEYS, 'aliases')) {
-      if (typeof v !== 'string' || !ALIAS.test(v)) throw new PolicyError('an alias is 1 to 24 characters: a lowercase letter, then lowercase letters, digits or dashes');
+      if (typeof v !== 'string' || !ALIAS_PRESETS.includes(v)) throw new PolicyError('an alias must be one of the fixed choices this page offers');
       policy.aliases[k] = v;
     }
     if (p.has('toolFilter')) for (const [k, v] of pick(p.get('toolFilter'), MEMBER_KEYS, 'toolFilter')) policy.toolFilter[k] = v === null ? null : nameList(v, 'a tool filter');
@@ -91,8 +90,8 @@ function buildGateway(policy, listNumber, hostileTools) {
 }
 
 // Only names that really are in the catalog are echoed: a policy entry nobody can match is counted, never shown. That holds
-// for the entitlement list, the cap list and each member's ToolFilter. (An alias is the one typed value that comes back:
-// it is a public label that is part of every namespaced name, and it is bounded to 24 characters of a-z, 0-9 and dash.)
+// for the entitlement list, the cap list and each member's ToolFilter. An alias is never typed: it is one of ALIAS_PRESETS,
+// so a request cannot put its own text into any name.
 const knownNames = (policy, hostileTools) => new Set(MEMBER_KEYS.flatMap((k) => memberTools(k, 2, hostileTools).map((t) => `${policy.aliases[k]}${SEP}${t.name}`)));
 const knownTools = (key, hostileTools) => new Set(memberTools(key, 2, hostileTools).map((t) => t.name));
 
@@ -148,13 +147,17 @@ export async function runGateway(request) {
     const hiddenView = listing.hidden.map((h) => ({ name: h.name, alias: h.alias, reason: h.reason }));
     const bare = (key) => policy.aliases[key];
     const attemptNames = [`${bare('bank')}${SEP}get_balance`, `${bare('hostile')}${SEP}get_stock_price`, `${bare('hostile')}${SEP}create_transfer`, `${bare('hostile')}${SEP}bulk_export`, 'create_transfer', `${bare('hostile')}${SEP}bank${SEP}get_balance`];
-    // code is what the caller is told; auditReason is the demo audit view of why (a real gateway keeps it from the caller).
-    const attempts = attemptNames.map((name) => {
+    // The caller is told code and stage only. The reason for a refusal goes to the audit view (gateway.audit), never beside
+    // the caller's fields.
+    const attempts = [];
+    const auditAttempts = [];
+    for (const name of attemptNames) {
       const before = gw.audit().length;
       const r = gw.call({ entitled: policy.entitled }, name, {});
       const entry = gw.audit().slice(before)[0];
-      return { name, ok: r.ok, code: r.code, stage: r.stage, forwardedTo: r.forwardedTo ?? null, auditReason: entry ? entry.reason : null };
-    });
+      attempts.push({ name, ok: r.ok, code: r.code, stage: r.stage, forwardedTo: r.forwardedTo ?? null });
+      auditAttempts.push({ name, reason: entry ? entry.reason : null });
+    }
     const bareHit = (name) => direct.some((t) => t.name === name);
     const directAttempts = [{ name: 'create_transfer', reached: bareHit('create_transfer') }, { name: 'bulk_export', reached: bareHit('bulk_export') }];
 
@@ -172,9 +175,14 @@ export async function runGateway(request) {
           + MEMBER_KEYS.reduce((n, key) => n + (policy.toolFilter[key] === null ? 0 : policy.toolFilter[key].filter((t) => !toolsOf.get(key).has(t)).length), 0),
       },
       direct: { count: direct.length, tools: direct, collisions, silentlyMissing, attempts: directAttempts, victim: victimDirect },
+      // gateway.* outside gateway.audit is what the caller can see. gateway.audit is the demo audit view (an administrator's).
       gateway: {
-        count: listing.tools.length, tools: listing.tools, members: listing.members, unreachable: listing.unreachable,
-        hidden: hiddenView, hiddenCount: hiddenView.length, attempts, memberHops: gw.hops().length, pin, victim: victimGateway,
+        count: listing.tools.length, tools: listing.tools,
+        members: listing.members.map((m) => ({ alias: m.alias, status: m.status })),
+        unreachable: listing.unreachable, attempts, pin, victim: victimGateway,
+        audit: {
+          hidden: hiddenView, hiddenCount: hiddenView.length, members: listing.members, attempts: auditAttempts, memberHops: gw.hops().length,
+        },
       },
     };
   } finally {
@@ -186,6 +194,7 @@ export const gatewayConfig = (hostileTools) => ({
   callers: Object.fromEntries(Object.entries(CALLERS).map(([id, c]) => [id, { label: c.label, entitled: [...c.entitled] }])),
   defaults: defaultPolicy('analyst'),
   members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], tools: memberTools(key, 2, hostileTools).map((t) => t.name) })),
+  aliasPresets: [...ALIAS_PRESETS],
   tasks: [...TASKS],
   limits: { maxEntries: MAX_ENTRIES, maxName: MAX_NAME },
 });

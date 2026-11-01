@@ -31,12 +31,14 @@ test('GET /api/gateway/config says what is claimed, what is invented and that th
   assert.equal(c.members[0].tools.length, 2);
   assert.equal(c.members[1].tools.length, 13);
   assert.deepEqual(c.defaults.capAllow.length, 5);
+  assert.deepEqual(c.aliasPresets, ['hostile', 'bank', 'vendor', 'ledger', 'files', 'mail']);
+  assert.deepEqual(c.defaults.aliases, { bank: 'bank', hostile: 'hostile' });
   assert.match(c.tags.swagger, /console swagger name, 2026-10-31, schema only/);
 }));
 
 test('POST /api/gateway/run: real counts, side by side, for both callers and both lists', () => withServer(async ({ post }) => {
   const later = await (await post('/api/gateway/run', {})).json();
-  assert.deepEqual([later.direct.count, later.gateway.count, later.gateway.hiddenCount, later.gateway.memberHops, later.listNumber], [15, 4, 11, 2, 2]);
+  assert.deepEqual([later.direct.count, later.gateway.count, later.gateway.audit.hiddenCount, later.gateway.audit.memberHops, later.listNumber], [15, 4, 11, 2, 2]);
   assert.deepEqual(later.gateway.pin.changed, ['hostile__get_stock_price']);
   const first = await (await post('/api/gateway/run', { stage: 'first', caller: 'viewer' })).json();
   assert.deepEqual([first.direct.count, first.gateway.count, first.listNumber, first.gateway.pin], [14, 2, 1, null]);
@@ -50,16 +52,16 @@ test('edited policy goes through the API: alias, entitlement, cap, filter and re
   assert.equal((await run({ capAllow: null })).count, 5);
   assert.equal((await run({ toolFilter: { hostile: ['get_weather'] } })).count, 3);
   assert.deepEqual((await run({ reachable: { hostile: false } })).unreachable, ['hostile']);
-  assert.equal((await run({ aliases: { hostile: 'ext' } })).count, 2);
+  assert.equal((await run({ aliases: { hostile: 'vendor' } })).count, 2);
   const bankDown = await run({ reachable: { bank: false } });
   assert.deepEqual([bankDown.unreachable, bankDown.count], [['bank'], 2]);
-  assert.equal((await run({ aliases: { bank: 'acct' }, entitled: ['acct__get_balance'], capAllow: null })).count, 1);
+  assert.equal((await run({ aliases: { bank: 'ledger' }, entitled: ['ledger__get_balance'], capAllow: null })).count, 1);
 }));
 
 test('bad requests get a 400 with a fixed message and nothing typed is echoed', () => withServer(async ({ post }) => {
   const bodies = [
     { stage: SECRET }, { caller: SECRET }, { task: SECRET }, { [SECRET]: 1 }, { policy: { [SECRET]: 1 } },
-    { policy: { entitled: [`${SECRET} !`] } }, { policy: { aliases: { bank: SECRET } } }, { policy: { aliases: { bank: 'hostile' } } },
+    { policy: { entitled: [`${SECRET} !`] } }, { policy: { aliases: { bank: SECRET } } }, { policy: { aliases: { bank: 'hostile' } } }, { policy: { aliases: { bank: 'ext' } } },
     { policy: { entitled: Array.from({ length: 65 }, (_, i) => `bank__t${i}`) } },
   ];
   for (const b of bodies) {
@@ -93,12 +95,35 @@ test('a typed value never reaches a response field, the server log or an error',
       assert.deepEqual(JSON.parse(filtered).members.map((m) => m.toolFilter), [['get_balance'], []]);
       // a refused call tells the caller one thing, whether the tool is hidden or missing; the reason is the audit field
       const attempts = JSON.parse(await (await post('/api/gateway/run', {})).text()).gateway.attempts;
-      assert.ok(attempts.filter((a) => a.code === 'not_available').every((a) => !Object.hasOwn(a, 'name') || typeof a.auditReason === 'string'));
+      assert.ok(attempts.every((a) => !Object.hasOwn(a, 'auditReason') && !Object.hasOwn(a, 'reason')), 'the caller-side attempts carry no reason');
       for (const b of [{ policy: { entitled: [`${SECRET} !`] } }, { caller: SECRET }]) assert.ok(!(await (await post('/api/gateway/run', b)).text()).includes(SECRET));
     });
   } finally { Object.assign(console, real); }
   assert.ok(!lines.join('\n').includes(SECRET));
 });
+
+test('token-shaped strings in the old alias position and in every other field never come back, in any response or on the page', () => withServer(async ({ post, base, get }) => {
+  const leaks = ['ghp-aliasleak1234abcd', 'sk-live-aliasleak1234', 'eyJhbGciOiJub25lIn0.aliasleak1234.sig', 'AKIAALIASLEAK123456'];
+  const seen = [];
+  for (const leak of leaks) {
+    const bodies = [
+      { policy: { aliases: { bank: leak } } }, { policy: { aliases: { hostile: leak } } }, { policy: { aliases: { [leak]: 'bank' } } }, { policy: { aliases: { bank: [leak] } } },
+      { policy: { toolFilter: { bank: [leak], hostile: [leak, 'get_weather'] } } }, { policy: { entitled: [leak, `hostile__${leak}`, 'bank__get_balance'], capAllow: [leak] } },
+      { policy: { reachable: { bank: leak } } }, { policy: { [leak]: 1 } }, { [leak]: 1 }, { stage: leak }, { caller: leak }, { task: leak },
+    ];
+    for (const b of bodies) {
+      const r = await post('/api/gateway/run', b);
+      const text = await r.text();
+      assert.ok(!text.includes(leak.slice(0, 12)), `no response field repeats the input: ${JSON.stringify(b).slice(0, 30)}`);
+      if (r.status === 400 && JSON.stringify(b).includes('"aliases"') && !JSON.stringify(b).includes(`"${leak}":`)) seen.push(JSON.parse(text).message);
+    }
+    for (const q of [`/api/gateway/config?alias=${leak}`, `/api/gateway/run?alias=${leak}`]) assert.ok(!(await (await get(q)).text()).includes(leak.slice(0, 12)));
+  }
+  assert.equal(new Set(seen).size, 1, 'one generic 400 for an alias outside the fixed list');
+  assert.ok(seen.length >= leaks.length * 3);
+  const page = await (await fetch(base + '/')).text();
+  for (const leak of leaks) assert.ok(!page.includes(leak.slice(0, 12)));
+}));
 
 test('zero outbound attempts: every caller, both lists, edited policies and refusals, with the network blocked', async () => {
   const guard = guardNetwork();

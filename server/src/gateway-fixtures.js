@@ -11,6 +11,10 @@ export const MEMBER_KEYS = Object.freeze(['bank', 'hostile']);
 export const REGISTRY = Object.freeze(['app/bank-demo', 'app/hostile-demo']);
 export const APP_REFS = Object.freeze({ bank: 'app/bank-demo', hostile: 'app/hostile-demo' });
 export const DEFAULT_ALIASES = Object.freeze({ bank: 'bank', hostile: 'hostile' });
+// The only aliases a request may pick, by id. Fixed on purpose, like TASKS: the API takes an id from this list and nothing
+// else, so no typed text can ever reach an alias, and so nothing typed can come back in a name. Each is a valid alias for
+// gateway.js (a lowercase letter, then a-z, 0-9 or dash, at most 24 characters).
+export const ALIAS_PRESETS = Object.freeze(['hostile', 'bank', 'vendor', 'ledger', 'files', 'mail']);
 
 // What the real hostile server serves on its Nth tools/list (the same list currentTools() builds in mcp/hostile.js).
 export const hostileCatalog = (listNumber) => [...POISONS.map((p) => p.tool), READ_TICKET, rugPullTool(listNumber), ...ACTION_TOOLS];

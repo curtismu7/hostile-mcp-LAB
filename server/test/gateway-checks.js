@@ -4,10 +4,11 @@
 // covers: "MCP Aggregate" or "MCP Catalog (entitlement part)", or the hostile-server tricks the lab adds, and each pairs
 // real counts with a negative control. Every Ping product claim modelled here is UNVERIFIED on our tenant.
 import assert from 'node:assert/strict';
-import { APP_REFS, CALLERS, DEFAULT_CAP, REGISTRY, SPOOF_TOOL, LATE_TOOL, hostileCatalog, memberTools } from '../src/gateway-fixtures.js';
+import { ALIAS_PRESETS, APP_REFS, CALLERS, DEFAULT_CAP, REGISTRY, SPOOF_TOOL, LATE_TOOL, hostileCatalog, memberTools } from '../src/gateway-fixtures.js';
 import { rugPullTool } from '../src/mcp/tools.js';
 
 const SECRET = 'SECRET_TOKEN_123';
+const ALIAS_LEAK = 'ghp-aliasleak1234abcd';
 export const entitledOf = (caller) => ({ entitled: [...CALLERS[caller].entitled] });
 const names = (listing) => listing.tools.map((t) => t.name);
 const sorted = (xs) => [...xs].sort();
@@ -361,7 +362,7 @@ export const SCENARIO_CHECKS = [
     id: 'scenario-caller-and-stage', row: 'entitlement-aware discovery, per caller, with and without the later list',
     async run(mod) {
       const analystLater = await run(mod, { stage: 'later', caller: 'analyst' });
-      assert.deepEqual([analystLater.direct.count, analystLater.gateway.count, analystLater.gateway.hiddenCount], [15, 4, 11]);
+      assert.deepEqual([analystLater.direct.count, analystLater.gateway.count, analystLater.gateway.audit.hiddenCount], [15, 4, 11]);
       assert.deepEqual(analystLater.direct.collisions, ['get_balance']);
       assert.equal(analystLater.listNumber, 2);
       const analystFirst = await run(mod, { stage: 'first', caller: 'analyst' });
@@ -385,11 +386,12 @@ export const SCENARIO_CHECKS = [
       const attempt = Object.fromEntries(r.gateway.attempts.map((a) => [a.name, a]));
       assert.equal(attempt.hostile__create_transfer.ok, false);
       assert.equal(attempt.create_transfer.code, 'unprefixed');
-      assert.deepEqual([attempt.hostile__create_transfer.code, attempt.hostile__create_transfer.auditReason], ['not_available', 'not-entitled']);
+      const audit = Object.fromEntries(r.gateway.audit.attempts.map((a) => [a.name, a.reason]));
+      assert.deepEqual([attempt.hostile__create_transfer.code, audit.hostile__create_transfer], ['not_available', 'not-entitled']);
       assert.equal(attempt.hostile__bulk_export.code, attempt.hostile__create_transfer.code, 'a late tool and an action tool get the same caller-side answer');
-      assert.equal(attempt.bank__get_balance.auditReason, null, 'a forwarded call has nothing in the audit log');
+      assert.equal(audit.bank__get_balance, null, 'a forwarded call has nothing in the audit log');
       assert.equal(attempt.bank__get_balance.forwardedTo, 'bank');
-      assert.equal(r.gateway.memberHops, 2);
+      assert.equal(r.gateway.audit.memberHops, 2);
       assert.equal(r.gateway.attempts.length, 6);
       assert.equal(r.task, 'Check my account balance');
     },
@@ -411,17 +413,18 @@ export const SCENARIO_CHECKS = [
   {
     id: 'scenario-edit-alias', row: 'editable field: Alias',
     async run(mod) {
-      const r = await run(mod, { policy: { aliases: { hostile: 'ext' }, entitled: ['bank__get_balance', 'ext__get_weather'], capAllow: null } });
-      assert.deepEqual(listOf(r), ['bank__get_balance', 'ext__get_weather']);
-      assert.equal(r.members.find((m) => m.key === 'hostile').alias, 'ext');
-      const stock = r.gateway.attempts.find((a) => a.name === 'ext__get_stock_price');
-      assert.deepEqual([stock.code, stock.auditReason], ['not_available', 'not-entitled'], 'the caller is told not_available; the demo audit view says why');
-      const silent = await run(mod, { policy: { aliases: { hostile: 'ext' } } });
+      const r = await run(mod, { policy: { aliases: { hostile: 'vendor' }, entitled: ['bank__get_balance', 'vendor__get_weather'], capAllow: null } });
+      assert.deepEqual(listOf(r), ['bank__get_balance', 'vendor__get_weather']);
+      assert.equal(r.members.find((m) => m.key === 'hostile').alias, 'vendor');
+      const stock = r.gateway.attempts.find((a) => a.name === 'vendor__get_stock_price');
+      const why = r.gateway.audit.attempts.find((a) => a.name === 'vendor__get_stock_price').reason;
+      assert.deepEqual([stock.code, why], ['not_available', 'not-entitled'], 'the caller is told not_available; the demo audit view says why');
+      const silent = await run(mod, { policy: { aliases: { hostile: 'vendor' } } });
       assert.deepEqual(listOf(silent), ['bank__get_balance', 'bank__get_statement'], 'renaming without updating entitlements fails closed');
       // the bank's alias is an editable field of its own
-      const bankRenamed = await run(mod, { policy: { aliases: { bank: 'acct' }, entitled: ['acct__get_balance', 'hostile__get_weather'], capAllow: null } });
-      assert.deepEqual(listOf(bankRenamed), ['acct__get_balance', 'hostile__get_weather']);
-      assert.equal(bankRenamed.members.find((m) => m.key === 'bank').alias, 'acct');
+      const bankRenamed = await run(mod, { policy: { aliases: { bank: 'ledger' }, entitled: ['ledger__get_balance', 'hostile__get_weather'], capAllow: null } });
+      assert.deepEqual(listOf(bankRenamed), ['hostile__get_weather', 'ledger__get_balance']);
+      assert.equal(bankRenamed.members.find((m) => m.key === 'bank').alias, 'ledger');
       assert.equal(silent.policy.ignoredEntries, 6, 'three entitlement entries and three cap entries name the old prefix and match nothing; they are counted, not shown');
     },
   },
@@ -432,8 +435,8 @@ export const SCENARIO_CHECKS = [
       assert.deepEqual(listOf(one), ['bank__get_balance']);
       const none = await run(mod, { policy: { entitled: [] } });
       assert.deepEqual(listOf(none), []);
-      assert.equal(none.gateway.hiddenCount, 15);
-      assert.equal(none.gateway.memberHops, 0);
+      assert.equal(none.gateway.audit.hiddenCount, 15);
+      assert.equal(none.gateway.audit.memberHops, 0);
     },
   },
   {
@@ -451,7 +454,7 @@ export const SCENARIO_CHECKS = [
     async run(mod) {
       const r = await run(mod, { policy: { toolFilter: { hostile: ['get_weather'] } } });
       assert.deepEqual(listOf(r), ['bank__get_balance', 'bank__get_statement', 'hostile__get_weather']);
-      assert.ok(r.gateway.hidden.some((h) => h.name === 'hostile__get_stock_price' && h.reason === 'not-in-toolfilter'));
+      assert.ok(r.gateway.audit.hidden.some((h) => h.name === 'hostile__get_stock_price' && h.reason === 'not-in-toolfilter'));
       const bank = await run(mod, { policy: { toolFilter: { bank: ['get_statement'] } } });
       assert.ok(!listOf(bank).includes('bank__get_balance') && listOf(bank).includes('bank__get_statement'));
       assert.equal(r.members[1].toolFilter.length, 1);
@@ -500,7 +503,7 @@ export const SCENARIO_CHECKS = [
     async run(mod) {
       const bodies = [
         [{ stage: 'never' }], [{ caller: 'toString' }], [{ caller: '__proto__' }], [{ task: `free text ${SECRET}` }], [{ task: 7 }], [{ extra: 1 }],
-        [{ policy: { extra: 1 } }], [{ policy: { aliases: { other: 'x' } } }], [{ policy: { aliases: { bank: 'Bad' } } }], [{ policy: { aliases: { bank: 'a__b' } } }],
+        [{ policy: { extra: 1 } }], [{ policy: { aliases: { other: 'x' } } }], [{ policy: { aliases: { bank: 'Bad' } } }], [{ policy: { aliases: { bank: 'a__b' } } }], [{ policy: { aliases: { bank: 'ext' } } }], [{ policy: { aliases: { bank: 'ghp-aliasleak1234abcd' } } }], [{ policy: { aliases: { bank: 5 } } }], [{ policy: { aliases: { bank: ['vendor'] } } }],
         [{ policy: { aliases: { bank: 'hostile' } } }], [{ policy: { entitled: [`bank__${SECRET} bad`] } }], [{ policy: { entitled: 'bank__get_balance' } }],
         [{ policy: { entitled: Array.from({ length: 65 }, (_, i) => `bank__t${i}`) } }], [{ policy: { entitled: ['a'.repeat(97)] } }], [{ policy: { capAllow: 'all' } }],
         [{ policy: { toolFilter: { bank: 'get_balance' } } }], [{ policy: { reachable: { bank: 'no' } } }], [{ policy: [] }], [[]], ['text'],
@@ -538,11 +541,77 @@ export const SCENARIO_CHECKS = [
       const real = await run(mod, { policy: { toolFilter: { hostile: ['get_weather', 'get_stock_price'] } } });
       assert.deepEqual(real.members.map((m) => m.toolFilter), [null, ['get_weather', 'get_stock_price']]);
       assert.equal(real.policy.ignoredEntries, 0);
-      // an alias is a public label in every namespaced name: it is bounded and patterned, and it does come back (by design)
-      const aliased = await run(mod, { policy: { aliases: { hostile: 'ext-1' }, capAllow: null } });
-      assert.equal(aliased.members[1].alias, 'ext-1');
-      assert.equal(policyError(mod, { policy: { aliases: { hostile: `${SECRET}` } } })?.name, 'PolicyError', 'a mixed-case, underscore value is not a valid alias, so a typical token is refused');
+      // an alias is never typed: it is one of the fixed choices, so what comes back is a choice, not input
+      const aliased = await run(mod, { policy: { aliases: { hostile: 'vendor' }, capAllow: null } });
+      assert.equal(aliased.members[1].alias, 'vendor');
+      assert.equal(policyError(mod, { policy: { aliases: { hostile: `${SECRET}` } } })?.name, 'PolicyError');
       assert.deepEqual(listOf(r), ['bank__get_balance', 'bank__get_statement', 'hostile__get_stock_price', 'hostile__get_weather']);
+    },
+  },
+  {
+    id: 'scenario-alias-is-a-fixed-choice', row: 'an alias is chosen from a fixed list, never typed',
+    async run(mod) {
+      assert.deepEqual([...ALIAS_PRESETS].sort(), ['bank', 'files', 'hostile', 'ledger', 'mail', 'vendor']);
+      const config = mod.gatewayConfigResponse();
+      assert.deepEqual(config.aliasPresets, [...ALIAS_PRESETS]);
+      for (const id of ALIAS_PRESETS) {
+        const other = ALIAS_PRESETS.find((x) => x !== id && x !== 'bank');
+        const r = await run(mod, { policy: { aliases: { hostile: id === 'bank' ? other : id } } });
+        assert.ok(r.members[1].alias === (id === 'bank' ? other : id));
+      }
+      // token-shaped strings in the alias position, in every shape, are refused with one message that does not repeat them
+      const tokens = [ALIAS_LEAK, 'ghp-aliasleak1234abcd', 'sk-live-aliasleak1234', 'a'.repeat(24), 'x'.repeat(60), 'ext', 'Bank', 'bank ', ' bank', 'bank\n', '', 'BANK', 'ban', '__proto__', 'constructor', 'toString'];
+      const messages = new Set();
+      for (const t of tokens) {
+        const e = policyError(mod, { policy: { aliases: { bank: t } } });
+        assert.equal(e?.name, 'PolicyError', JSON.stringify(t));
+        if (t.length > 2) assert.ok(!e.message.includes(t), 'the refusal does not repeat the input');
+        messages.add(e.message);
+      }
+      assert.equal(messages.size, 1, 'one generic message for every value outside the list');
+      for (const t of tokens) assert.equal(policyError(mod, { policy: { aliases: { hostile: t } } })?.message, [...messages][0]);
+    },
+  },
+  {
+    id: 'scenario-token-shaped-input-never-echoed', row: 'no typed credential in any response field',
+    async run(mod) {
+      const leaks = ['ghp-aliasleak1234abcd', 'sk-live-aliasleak1234', 'eyJhbGciOiJub25lIn0.aliasleak1234.sig', 'AKIAALIASLEAK123456'];
+      for (const leak of leaks) {
+        const bodies = [
+          { policy: { toolFilter: { bank: [leak], hostile: [leak, 'get_weather'] } } },
+          { policy: { entitled: [leak, 'bank__get_balance'], capAllow: [leak, 'bank__get_balance'] } },
+          { policy: { entitled: [`bank__${leak}`, `${leak}__get_balance`, `hostile__${leak}`], capAllow: [`bank__${leak}`] } },
+        ];
+        for (const body of bodies) {
+          const r = await run(mod, body);
+          assert.ok(!JSON.stringify(r).includes(leak.slice(0, 12)), 'no response field carries what was typed');
+        }
+        for (const body of [{ stage: leak }, { caller: leak }, { task: leak }, { [leak]: 1 }, { policy: { [leak]: 1 } }, { policy: { aliases: { [leak]: 'bank' } } }, { policy: { aliases: { bank: leak } } }, { policy: { toolFilter: { [leak]: [] } } }, { policy: { reachable: { bank: leak } } }, { policy: { reachable: { [leak]: true } } }]) {
+          const e = policyError(mod, body);
+          assert.equal(e?.name, 'PolicyError');
+          assert.ok(!e.message.includes(leak.slice(0, 12)));
+        }
+      }
+    },
+  },
+  {
+    id: 'scenario-caller-view-carries-no-audit', row: 'the caller section is separate from the demo audit view',
+    async run(mod) {
+      const r = await run(mod, { stage: 'later', caller: 'analyst' });
+      const { audit, ...callerSide } = r.gateway;
+      assert.deepEqual(Object.keys(audit).sort(), ['attempts', 'hidden', 'hiddenCount', 'memberHops', 'members']);
+      const text = JSON.stringify(callerSide);
+      for (const key of ['hidden', 'hiddenCount', 'auditReason', 'reason', 'offered', 'listed', 'memberHops', 'audit']) assert.ok(!text.includes(`"${key}"`), `the caller section has no ${key}`);
+      for (const word of ['not-entitled', 'over-cap', 'not-in-toolfilter', 'no_such_tool', 'duplicate-in-member', 'invalid-name']) assert.ok(!text.includes(word), `the caller section never says ${word}`);
+      for (const h of audit.hidden) assert.ok(!callerSide.tools.some((t) => t.name === h.name), 'a hidden name is not a listed tool');
+      assert.deepEqual(callerSide.members.map((m) => Object.keys(m).sort()), [['alias', 'status'], ['alias', 'status']]);
+      assert.ok(audit.members.every((m) => Object.hasOwn(m, 'offered')));
+      assert.equal(audit.attempts.length, callerSide.attempts.length);
+      // the other tools hidden from this caller are named only inside the audit view
+      for (const name of ['hostile__create_transfer', 'hostile__send_email']) {
+        assert.ok(audit.hidden.some((h) => h.name === name));
+        assert.ok(!callerSide.tools.some((t) => t.name === name));
+      }
     },
   },
 ];
