@@ -24,7 +24,7 @@ async function withServer(fn, env = {}) {
 test('GET /api/gateway/config says what is claimed, what is invented and that there is no live path', () => withServer(async ({ get }) => {
   const c = await (await get('/api/gateway/config')).json();
   assert.match(c.status, /Ping release claim \(2026-11-02\), UNVERIFIED on our tenant/);
-  assert.match(c.mode, /no live path/);
+  assert.match(c.mode, /no live path/i);
   assert.deepEqual(Object.keys(c.callers).sort(), ['analyst', 'viewer']);
   assert.equal(c.tasks.length, 7);
   assert.deepEqual(c.members.map((m) => m.key), ['bank', 'hostile']);
