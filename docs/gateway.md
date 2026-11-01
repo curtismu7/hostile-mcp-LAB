@@ -15,7 +15,7 @@ Story S36 ("One listing, checked twice", ID provisional) is on the Gateway tab w
 
 ## Demo audit pane
 
-A real gateway would show an administrator which tools it hid and why. The Gateway tab shows that too, so the demo can explain itself, but it is labelled **Demo audit pane** and kept apart from what the caller gets. The hidden count, the per-server offered counts, the reason for each refused probe call and the Outcome column of the policy table are the audit view. The caller sees the listed tools, whether each server is reachable, and, for a refused call, only `not available`: the same answer for a tool that is hidden by entitlement, hidden by the cap, outside the ToolFilter or does not exist, so a call cannot be used to enumerate what the caller was not shown. That uniform answer is a lab reading; the release claim does not say what a refused call returns. A call to an unreachable server gets `member unreachable`, because the listing already reports it.
+A real gateway would show an administrator which tools it hid and why. The Gateway tab shows that too, so the demo can explain itself, but it is labelled **Demo audit pane** and kept apart from what the caller gets. The hidden count and names, the per-server offered counts, the reason for each refused probe call, the member-hop count and the Outcome column of the policy table are the audit view. In the API they sit under `gateway.audit`, apart from the caller's fields (`gateway.tools`, `members` with only `alias` and `status`, `unreachable`, `attempts` with only `code` and `stage`, `pin`, `victim`); on the page the audit pane is its own section, not part of the caller's card. The caller sees the listed tools, whether each server is reachable, and, for a refused call, only `not available`: the same answer for a tool that is hidden by entitlement, hidden by the cap, outside the ToolFilter or does not exist, so a call cannot be used to enumerate what the caller was not shown. That uniform answer is a lab reading; the release claim does not say what a refused call returns. A call to an unreachable server gets `member unreachable`, because the listing already reports it.
 
 ## Where every statement comes from
 
@@ -28,6 +28,7 @@ A real gateway would show an administrator which tools it hid and why. The Gatew
 | ToolFilter is an allow-list, empty means no limit | lab reading (the schema gives only the type) |
 | A member must be a registered application; an unknown `AppRef` is refused | lab reading |
 | An alias has no underscore, so the first `__` ends it | lab-invented |
+| The aliases the page offers (`hostile`, `bank`, `vendor`, `ledger`, `files`, `mail`) | lab-invented; the Alias field is a swagger name, the list of choices is ours |
 | Callers `analyst` and `viewer`, their lists, the cap list, the tools `get_statement`, `bulk_export` and `bank__get_balance` | lab-invented fixtures (the real hostile server does not serve those three) |
 | Per-user upstream OAuth to members | not simulated |
 
@@ -37,14 +38,14 @@ Identity wording: Federated Identity is a display name. The API object is still 
 
 - `server/src/gateway.js`: the pure model (about 140 lines, no imports). `createGateway({ registry, members, capAllow })` returns `list`, `call`, `hops`, `audit`, `aliases`.
 - `server/src/gateway-scenario.js`: request validation (`parseRequest`), the run (`runGateway`), `defaultPolicy`, the config the page loads.
-- `server/src/gateway-fixtures.js`: callers, cap, simulated tools, the fixed task list.
-- API: `GET /api/gateway/config`, `POST /api/gateway/run` with `{ stage, caller, task, policy }`. Unknown fields, a typed value that matches no tool (in the entitlement list, the cap list or a ToolFilter), and a free-text task are refused or ignored without being echoed; ignored entries are counted. An alias is the one typed value that comes back, because it is a public label in every tool name (the swagger `Alias` field): it is limited to 24 characters of a-z, 0-9 and dash, and the page says never to type a secret into it.
+- `server/src/gateway-fixtures.js`: callers, cap, simulated tools, the fixed task list and the fixed alias list (`ALIAS_PRESETS`).
+- API: `GET /api/gateway/config`, `POST /api/gateway/run` with `{ stage, caller, task, policy }`. Unknown fields, a typed value that matches no tool (in the entitlement list, the cap list or a ToolFilter), and a free-text task are refused or ignored without being echoed; ignored entries are counted. An alias is never typed: the API takes one of the fixed ids in `ALIAS_PRESETS` (`GET /api/gateway/config` lists them as `aliasPresets`) and anything else gets one generic 400 that does not repeat the input. The page offers the ids in a select, and the choice the other server holds is disabled, so no invalid alias state is ever posted. The rule: a typed credential is never echoed in any response field; a ToolFilter, entitlement or cap entry that matches no tool is counted, never shown. The response has two parts: `gateway` outside `gateway.audit` is what the caller sees, and `gateway.audit` is the demo audit view (hidden names and counts, offered counts, a reason per refused probe call, member hops).
 
 ## Tests
 
 - `server/test/gateway-checks.js`: the named checks (one or more per row of the feature test plan, each with a negative control) and the scenario checks (one per editable policy field).
-- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 46 mutated copies of the source, one per member for each per-member field and requires a named check to fail for each one.
+- `server/test/gateway.test.js` runs them on the real source. `gateway-mutation.test.js` runs them on 56 mutated copies of the source, one per member for each per-member field and requires a named check to fail for each one.
 - `server/test/gateway-api.test.js`: HTTP, no echo of typed values, zero outbound attempts under the network guard, hosted-mock behaviour.
 - `web/src/pages/Gateway.test.jsx`: the page driven by the real engine, every editable field (including each Cap allows checkbox), the demo audit pane, Reset, Simulate.
 - `web/src/pages/GatewayDiagram.test.jsx`: a drag is kept per view and Reset restores the boxes (ReactFlow is replaced by a stand-in, because jsdom cannot drag).
-- `scripts/web-mutation.mjs`: 19 mutants of the page and the diagram, each of which must fail a page test. `scripts/e2e.mjs` drags a real box and presses Reset in Chromium.
+- `scripts/web-mutation.mjs`: 41 mutants of the page and the diagram, including one per server for each editable field (Alias, ToolFilter, Reachable, and the Entitled and Cap allows rows) in the handler and in the request, each of which must fail a page test. `scripts/e2e.mjs` drags a real box and presses Reset in Chromium.

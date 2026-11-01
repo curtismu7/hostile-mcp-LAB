@@ -64,21 +64,22 @@ function Direct({ r }) {
 }
 
 function Audit({ g }) {
+  const a = g.audit;
   return (
     <aside className="gw__audit" aria-labelledby="gw-audit-h" data-testid="gw-audit">
       <h4 id="gw-audit-h">Demo audit pane</h4>
       <p className="muted small">This is an administrator's view, shown here so you can see why. The caller is not shown it: a caller sees only the listed tools and, for a refused call, the words <code>not available</code>, the same for a hidden tool and one that does not exist (a lab reading; the release claim does not say).</p>
-      <p className="small" data-testid="gw-audit-hidden"><strong>{g.hiddenCount}</strong> tools hidden from this caller.</p>
+      <p className="small" data-testid="gw-audit-hidden"><strong>{a.hiddenCount}</strong> tools hidden from this caller.</p>
       <ul className="small">
-        {g.members.map((m) => (
+        {a.members.map((m) => (
           <li key={m.alias}><code>{m.alias}</code>: {m.status === "ok" ? `${m.listed} of ${m.offered} offered tools listed` : "unreachable, nothing offered"}</li>
         ))}
       </ul>
       <p className="small">Why each probe call was refused:</p>
       <ul className="small" data-testid="gw-audit-reasons">
-        {g.attempts.map((a) => <li key={a.name}><code>{a.name}</code>: {a.ok ? `forwarded to ${a.forwardedTo}` : (a.auditReason ? (REASON[a.auditReason] ?? told(a.auditReason)) : told(a.code))}</li>)}
+        {g.attempts.map((c, i) => <li key={c.name}><code>{c.name}</code>: {c.ok ? `forwarded to ${c.forwardedTo}` : (a.attempts[i].reason ? (REASON[a.attempts[i].reason] ?? told(a.attempts[i].reason)) : told(c.code))}</li>)}
       </ul>
-      <p className="small" data-testid="gw-hops"><strong>{g.memberHops}</strong> of {g.attempts.length} calls reached a member.</p>
+      <p className="small" data-testid="gw-hops"><strong>{a.memberHops}</strong> of {g.attempts.length} calls reached a member.</p>
     </aside>
   );
 }
@@ -129,7 +130,6 @@ function Via({ r }) {
       )}
       <h4>The call the victim would make</h4>
       <p data-testid="gw-gateway-victim"><code>{callsText(g.victim)}</code></p>
-      <Audit g={g} />
     </section>
   );
 }
@@ -169,7 +169,7 @@ export default function Gateway({ present, theme = "system" }) {
     const alias = result.members.find((m) => m.key === row.key).alias;
     const name = `${alias}__${row.tool}`;
     if (result.gateway.tools.some((t) => t.name === name)) return "listed";
-    const h = result.gateway.hidden.find((x) => x.name === name);
+    const h = result.gateway.audit.hidden.find((x) => x.name === name);
     if (h) return `hidden: ${REASON[h.reason] ?? h.reason}`;
     if (result.gateway.unreachable.includes(alias)) return "member unreachable";
     return "not offered on this list";
@@ -210,16 +210,19 @@ export default function Gateway({ present, theme = "system" }) {
           <Via r={result} />
         </div>
       )}
+      {result && <Audit g={result.gateway} />}
 
       <section className="card gw__editor" aria-labelledby="gw-editor-h">
         <h3 id="gw-editor-h">The policy you can edit</h3>
-        <p className="muted small">Entitlements and the cap are written against the namespaced name, so renaming an alias without updating them hides that server's tools: it fails closed. An alias is a public label that appears in every tool name, so never type a secret into it. The Reset button under the diagram puts every field back.</p>
+        <p className="muted small">Entitlements and the cap are written against the namespaced name, so renaming an alias without updating them hides that server's tools: it fails closed. An alias is chosen from a fixed list, so nothing typed can end up in a tool name. The Reset button under the diagram puts every field back.</p>
         <div className="controls">
           {MEMBERS.map((k) => (
             <fieldset key={k} className="gw__member">
               <legend>Server: {k} <span className="muted small">({cfg.members.find((m) => m.key === k).appRef})</span></legend>
               <label>Alias
-                <input value={ed.aliases[k]} maxLength={24} aria-label={`Alias for ${k}`} onChange={(e) => set({ aliases: { ...ed.aliases, [k]: e.target.value } })} />
+                <select value={ed.aliases[k]} aria-label={`Alias for ${k}`} onChange={(e) => set({ aliases: { ...ed.aliases, [k]: e.target.value } })}>
+                  {cfg.aliasPresets.map((a) => <option key={a} value={a} disabled={MEMBERS.some((o) => o !== k && ed.aliases[o] === a)}>{a}</option>)}
+                </select>
               </label>
               <label>ToolFilter (names, comma separated; empty = none)
                 <input value={ed.filterText[k]} aria-label={`ToolFilter for ${k}`} onChange={(e) => set({ filterText: { ...ed.filterText, [k]: e.target.value } })} />

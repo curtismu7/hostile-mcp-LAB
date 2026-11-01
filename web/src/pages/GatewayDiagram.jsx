@@ -52,14 +52,15 @@ export function stepsFor(view, r) {
       { edges: ["d2"], nodes: ["hostile", "caller"], text: d.silentlyMissing.length ? `${d.silentlyMissing.join(", ")} is down and its tools are simply absent. Nothing says so.` : `Nothing checks a call: ${d.attempts.filter((a) => a.reached).map((a) => a.name).join(", ") || "none of the probe calls"} would reach a server.` },
     ];
   }
-  const offered = g.members.filter((m) => m.status === "ok").reduce((n, m) => n + m.offered, 0);
-  const byFilter = count(g.hidden, "not-entitled") + count(g.hidden, "not-in-toolfilter");
+  const a = g.audit;
+  const offered = a.members.filter((m) => m.status === "ok").reduce((n, m) => n + m.offered, 0);
+  const byFilter = count(a.hidden, "not-entitled") + count(a.hidden, "not-in-toolfilter");
   return [
     { edges: ["g1", "g2"], nodes: ["bank", "hostile", "gw"], text: `One connection to the gateway. The servers offer ${offered} tools in all${g.unreachable.length ? `; ${g.unreachable.join(", ")} is unreachable and is reported` : ""}.` },
     { edges: ["g3", "g6"], nodes: ["gw", "filter", "hidden"], text: `Names get their alias prefix. The entitlement filter and ToolFilter remove ${byFilter} for this caller.` },
-    { edges: ["g4", "g6"], nodes: ["filter", "cap", "hidden"], text: `The policy cap removes ${count(g.hidden, "over-cap")} more that the caller is entitled to but the aggregate does not allow.` },
+    { edges: ["g4", "g6"], nodes: ["filter", "cap", "hidden"], text: `The policy cap removes ${count(a.hidden, "over-cap")} more that the caller is entitled to but the aggregate does not allow.` },
     { edges: ["g5"], nodes: ["cap", "caller"], text: `The caller sees ${g.count} tools: ${g.tools.map((t) => t.name).join(", ") || "none"}.` },
-    { edges: ["g7"], nodes: ["caller", "gw"], text: `The same decision runs again at the member hop: ${g.memberHops} of ${g.attempts.length} probe calls reached a server.` },
+    { edges: ["g7"], nodes: ["caller", "gw"], text: `The same decision runs again at the member hop: ${a.memberHops} of ${g.attempts.length} probe calls reached a server.` },
   ];
 }
 
