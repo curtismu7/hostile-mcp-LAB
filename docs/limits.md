@@ -21,3 +21,12 @@ Does not catch:
 Per-poison answers, including what a metadata scanner would catch, are in [threat-catalog.md](threat-catalog.md).
 
 Also not verified here: the victim is a stand-in for a trusting model, not a model. It shows what a client that obeys metadata would do. It does not measure how often a real model is fooled.
+
+## What the gateway simulation does not do
+
+A Ping release claim (2026-11-02), UNVERIFIED on our tenant. Generated copy: [threat-catalog.md](threat-catalog.md).
+
+- The filter decides which tools a caller sees. It does not read them: an entitled tool under the cap is delivered exactly as the member wrote it, poisoned description included.
+- Entitlements and the cap are written by a person. A tool you entitled and capped in stays listed after its description is rug-pulled; pinning is what notices the change.
+- It decides which tools are listed and callable. It does not read call results, resources or prompts.
+- There is no live path. Per-user upstream OAuth to members is not simulated.
