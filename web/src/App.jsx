@@ -5,7 +5,8 @@ import RugPull from "./pages/RugPull.jsx";
 import Limits from "./pages/Limits.jsx";
 import Diagram from "./pages/Diagram.jsx";
 import Gateway from "./pages/Gateway.jsx";
-import { getHealth } from "./lib/api.js";
+import { getHealth, getInfo, setMode } from "./lib/api.js";
+import ModeToggle from "./components/ModeToggle.jsx";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
 export const PAGES = [
@@ -27,9 +28,13 @@ export default function App() {
   const [page, setPage] = useState(pageFromHash);
   const [theme, setTheme] = useState(() => (["light", "dark"].includes(read("hostile.theme", "")) ? read("hostile.theme", "") : "system"));
   const [mockOnly, setMockOnly] = useState(false);
+  const [info, setInfo] = useState(null);
   const [present, setPresent] = useState(() => read("hostile.present", "0") === "1");
 
   useEffect(() => { getHealth().then((h) => setMockOnly(h?.mode === "mock-only")).catch(() => {}); }, []);
+  useEffect(() => { getInfo().then(setInfo).catch(() => {}); }, []);
+  // Rule 19: the Mock/Real toggle shows the server's answer to a switch.
+  const selectMode = async (source) => { try { setInfo(await setMode(source)); } catch { /* the toggle keeps showing the current mode */ } };
   useEffect(() => {
     const on = () => setPage(pageFromHash());
     window.addEventListener("hashchange", on);
@@ -58,6 +63,7 @@ export default function App() {
       {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
       <header className="top">
         <h1>Hostile MCP</h1>
+        <ModeToggle info={info} onSelect={selectMode} />
         <nav aria-label="Pages">
           {PAGES.map(([id, label]) => <a key={id} href={`#/${id}`} aria-current={id === page ? "page" : undefined}>{label}</a>)}
         </nav>
