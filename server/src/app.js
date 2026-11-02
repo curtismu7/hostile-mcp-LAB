@@ -36,6 +36,18 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   api.use(express.json({ limit: '8kb' }));
   api.use(mockOnlyGuard(mock));
   api.use('/health', health.router);
+  // Rule 19: the Mock/Real toggle's API. This app is mock only (no outbound call of any kind), so Real is never available.
+  // The hosted build (MOCK_ONLY) reports itself and refuses every switch.
+  const NO_REAL = 'Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo.';
+  const infoBody = () => ({ mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false });
+  api.get('/info', (_req, res) => res.json(infoBody()));
+  api.post('/mode', (req, res) => {
+    const b = req.body;
+    if (b === null || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length !== 1 || !['mock', 'real'].includes(b.source)) return bad(res, 'body must be exactly {source: "mock" or "real"}');
+    if (mock) return bad(res, 'The hosted build is Mock only and cannot be switched.', 403);
+    if (b.source === 'real') return bad(res, NO_REAL, 409);
+    return res.json(infoBody());
+  });
   api.get('/catalog', (_req, res) => res.json(catalog()));
   // The payload host scan, run on demand: every payload the server can put on the wire, checked for any non-reserved host.
   api.get('/safety-scan', (_req, res) => {
