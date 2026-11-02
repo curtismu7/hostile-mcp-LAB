@@ -13,15 +13,16 @@ import WHY from "../data/whyItMatters.json";
 const SECRET = "SECRET_TOKEN_123";
 let posts;
 let statuses;
+let answers;
 beforeEach(() => {
-  localStorage.clear(); window.location.hash = ""; posts = []; statuses = [];
+  localStorage.clear(); window.location.hash = ""; posts = []; statuses = []; answers = [];
   vi.stubGlobal("fetch", vi.fn(async (url, init = {}) => {
     const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
     if (url === "/api/gateway/config") return json(200, gatewayConfigResponse());
     if (url === "/api/gateway/run") {
       const body = JSON.parse(init.body);
       posts.push(body);
-      try { const out = await runGateway(parseRequest(body)); statuses.push(200); return json(200, out); } catch (e) { if (e instanceof PolicyError) { statuses.push(400); return json(400, { message: e.message }); } throw e; }
+      try { const out = await runGateway(parseRequest(body)); statuses.push(200); answers.push(out); return json(200, out); } catch (e) { if (e instanceof PolicyError) { statuses.push(400); return json(400, { message: e.message }); } throw e; }
     }
     return json(404, { message: "no mock" });
   }));
@@ -369,6 +370,35 @@ test("a comma separated ToolFilter entry is split into names, whitespace and emp
   await userEvent.type(input, " , ,");
   await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toBeNull());
   await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+});
+
+test("ToolFilter names that match real tools are not echoed in any answer outside the demo audit view, and Reset keeps it so", async () => {
+  render(<Gateway />);
+  await ready();
+  // the answer minus the labelled audit view and minus the unfiltered tool list of the no-gateway side (which names every tool by design)
+  const outside = (a) => { const { audit, ...callerSide } = a.gateway; return JSON.stringify({ ...a, direct: { ...a.direct, tools: null }, gateway: callerSide }); };
+  const input = screen.getByLabelText("ToolFilter for hostile");
+  // comma separated, with spaces, an empty part and a trailing comma: split by the page, limited by the engine, echoed nowhere
+  await userEvent.type(input, " send_email , ,, get_weather ,search_docs,");
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter.hostile).toEqual(["send_email", "get_weather", "search_docs"]));
+  await waitFor(() => expect(screen.getByTestId("gw-state")).toHaveTextContent("Up to date"));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(3));
+  expect(answers.length).toBeGreaterThan(0);
+  const filtered = answers.at(-1);
+  expect(filtered.members.every((m) => !Object.hasOwn(m, "toolFilter"))).toBe(true);
+  for (const a of answers.filter((x, i) => posts[i].policy.toolFilter.hostile !== null)) {
+    expect(outside(a)).not.toContain("send_email");
+    expect(outside(a)).not.toContain("search_docs");
+  }
+  // the filter still limits the listing, and the audit pane still says what it hid
+  expect(within(screen.getByTestId("gw-policy")).getByText("hostile__get_stock_price").closest("tr")).toHaveTextContent("hidden: outside ToolFilter");
+  // Reset: the filter text and the request go back, and the answer after it echoes no ToolFilter either
+  await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+  await waitFor(() => expect(posts.at(-1).policy.toolFilter).toEqual({ bank: null, hostile: null }));
+  await waitFor(() => expect(count("gw-gateway-count")).toBe(4));
+  expect(input).toHaveValue("");
+  expect(answers.at(-1).members.every((m) => !Object.hasOwn(m, "toolFilter"))).toBe(true);
+  expect(outside(answers.at(-1))).not.toContain("send_email");
 });
 
 test("Simulate walks the gateway view with the measured numbers, and Reset clears the walk", async () => {

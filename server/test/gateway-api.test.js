@@ -92,7 +92,12 @@ test('a typed value never reaches a response field, the server log or an error',
       const filtered = await (await post('/api/gateway/run', { policy: { toolFilter: { bank: [`sk-live-${SECRET}`, 'get_balance'], hostile: [`nonexistent_${SECRET}`] } } })).text();
       assert.ok(!filtered.includes(SECRET));
       assert.equal(JSON.parse(filtered).policy.ignoredEntries, 2);
-      assert.deepEqual(JSON.parse(filtered).members.map((m) => m.toolFilter), [['get_balance'], []]);
+      assert.ok(JSON.parse(filtered).members.every((m) => !Object.hasOwn(m, 'toolFilter')), 'no member carries a ToolFilter back');
+      // names that match real tools are not echoed outside the demo audit view either
+      const named = JSON.parse(await (await post('/api/gateway/run', { policy: { toolFilter: { hostile: ['send_email', 'get_weather'] } } })).text());
+      const { audit, ...callerSide } = named.gateway;
+      assert.ok(!JSON.stringify({ ...named, direct: { ...named.direct, tools: null }, gateway: callerSide }).includes('send_email'));
+      assert.ok(audit.hidden.some((h) => h.name === 'hostile__send_email'));
       // a refused call tells the caller one thing, whether the tool is hidden or missing; the reason is the audit field
       const attempts = JSON.parse(await (await post('/api/gateway/run', {})).text()).gateway.attempts;
       assert.ok(attempts.every((a) => !Object.hasOwn(a, 'auditReason') && !Object.hasOwn(a, 'reason')), 'the caller-side attempts carry no reason');
