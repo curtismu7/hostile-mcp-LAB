@@ -10,18 +10,19 @@
     "web"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
     "start": "npm start -w server",
-    "test": "npm test -w server && npm test -w web && node --test scripts/content-pack.test.mjs scripts/docs.test.mjs scripts/compose.test.mjs",
+    "test": "npm test -w server && npm test -w web && node --test scripts/content-pack.test.mjs scripts/docs.test.mjs scripts/compose.test.mjs scripts/check-forbidden-strings.test.mjs",
     "build": "npm run build -w web",
     "doctor": "node scripts/doctor.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "e2e": "node scripts/e2e.mjs",
     "mutation:web": "node scripts/web-mutation.mjs",
-    "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs"
+    "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
+    "check:forbidden": "node scripts/check-forbidden-strings.mjs"
   },
   "devDependencies": {
     "ajv": "^8.20.0",
