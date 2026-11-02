@@ -89,9 +89,10 @@ function buildGateway(policy, listNumber, hostileTools) {
   });
 }
 
-// A policy entry nobody can match is counted, never shown. Only each member's ToolFilter is echoed back, and only the names
-// the member really has; the entitlement list and the cap list are not echoed at all (see policy below). An alias is never
-// typed: it is one of ALIAS_PRESETS, so a request cannot put its own text into any name.
+// A policy entry nobody can match is counted, never shown. The entitlement list, the cap list and each member's ToolFilter are
+// not echoed at all, matching names included (see members and policy below): a name a filter or the cap hides is a name the
+// caller was not shown, and gateway.audit.hidden tells an administrator why. An alias is never typed: it is one of ALIAS_PRESETS,
+// so a request cannot put its own text into any name.
 const knownNames = (policy, hostileTools) => new Set(MEMBER_KEYS.flatMap((k) => memberTools(k, 2, hostileTools).map((t) => `${policy.aliases[k]}${SEP}${t.name}`)));
 const knownTools = (key, hostileTools) => new Set(memberTools(key, 2, hostileTools).map((t) => t.name));
 
@@ -167,9 +168,9 @@ export async function runGateway(request) {
 
     return {
       stage, caller, task, listNumber,
-      members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], alias: policy.aliases[key], reachable: policy.reachable[key], toolFilter: policy.toolFilter[key] === null ? null : policy.toolFilter[key].filter((n) => toolsOf.get(key).has(n)) })),
-      // A count and nothing else. The entitlement and cap lists are not echoed: a name on them that the cap or a ToolFilter
-      // hides is a name the caller was not shown, and gateway.audit.hidden already tells an administrator why.
+      members: MEMBER_KEYS.map((key) => ({ key, appRef: APP_REFS[key], alias: policy.aliases[key], reachable: policy.reachable[key] })),
+      // A count and nothing else. The entitlement and cap lists and the ToolFilters are not echoed: a name on them that the cap
+      // or a ToolFilter hides is a name the caller was not shown, and gateway.audit.hidden already tells an administrator why.
       policy: {
         ignoredEntries: policy.entitled.filter((n) => !known.has(n)).length + (policy.capAllow === null ? 0 : policy.capAllow.filter((n) => !known.has(n)).length)
           + MEMBER_KEYS.reduce((n, key) => n + (policy.toolFilter[key] === null ? 0 : policy.toolFilter[key].filter((t) => !toolsOf.get(key).has(t)).length), 0),

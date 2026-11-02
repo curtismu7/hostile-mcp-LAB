@@ -457,7 +457,7 @@ export const SCENARIO_CHECKS = [
       assert.ok(r.gateway.audit.hidden.some((h) => h.name === 'hostile__get_stock_price' && h.reason === 'not-in-toolfilter'));
       const bank = await run(mod, { policy: { toolFilter: { bank: ['get_statement'] } } });
       assert.ok(!listOf(bank).includes('bank__get_balance') && listOf(bank).includes('bank__get_statement'));
-      assert.equal(r.members[1].toolFilter.length, 1);
+      assert.equal(r.policy.ignoredEntries, 0);
       const cleared = await run(mod, { policy: { toolFilter: { hostile: null } } });
       assert.equal(cleared.gateway.count, 4);
     },
@@ -535,13 +535,13 @@ export const SCENARIO_CHECKS = [
       const filtered = await run(mod, { policy: { toolFilter: { bank: [`${SECRET}-bank`, 'get_balance'], hostile: ['get_weather', `sk-live-${SECRET}`, 'nonexistent_tool_x'] } } });
       assert.ok(!JSON.stringify(filtered).includes(SECRET), 'no response field carries a typed ToolFilter entry');
       assert.ok(!JSON.stringify(filtered).includes('nonexistent_tool_x'));
-      assert.deepEqual(filtered.members.map((m) => m.toolFilter), [['get_balance'], ['get_weather']]);
+      assert.ok(filtered.members.every((m) => !Object.hasOwn(m, 'toolFilter')), 'a ToolFilter is not echoed on the members either, matching names included');
       assert.equal(filtered.policy.ignoredEntries, 3, 'the three entries that match no tool are counted, never shown');
       assert.deepEqual(listOf(filtered), ['bank__get_balance', 'hostile__get_weather']);
-      // negative control: with real names only, the filter comes back whole and nothing is ignored
+      // negative control: with real names only nothing is ignored, and the filter still limits the listing
       const real = await run(mod, { policy: { toolFilter: { hostile: ['get_weather', 'get_stock_price'] } } });
-      assert.deepEqual(real.members.map((m) => m.toolFilter), [null, ['get_weather', 'get_stock_price']]);
       assert.equal(real.policy.ignoredEntries, 0);
+      assert.deepEqual(listOf(real), ['bank__get_balance', 'bank__get_statement', 'hostile__get_stock_price', 'hostile__get_weather']);
       // an alias is never typed: it is one of the fixed choices, so what comes back is a choice, not input
       const aliased = await run(mod, { policy: { aliases: { hostile: 'vendor' }, capAllow: null } });
       assert.equal(aliased.members[1].alias, 'vendor');
@@ -636,6 +636,36 @@ export const SCENARIO_CHECKS = [
       const { audit: wideAudit, ...wideSide } = wide.gateway;
       assert.ok(!JSON.stringify({ ...wide, direct: null, gateway: wideSide }).includes('hostile__send_email'));
       assert.ok(wideAudit.hidden.some((h) => h.name === 'hostile__send_email'));
+    },
+  },
+  {
+    id: 'scenario-no-toolfilter-echo-outside-audit', row: 'ToolFilter names that match real tools are not echoed outside the demo audit view',
+    async run(mod) {
+      // the answer minus the labelled audit view and minus the unfiltered tool list of the no-gateway side (which names every tool by design)
+      const outsideOf = (r) => { const { audit, ...callerSide } = r.gateway; return JSON.stringify({ ...r, direct: { ...r.direct, tools: null }, gateway: callerSide }); };
+      // analyst is entitled to hostile__send_email but the default cap hides it; hostile__search_docs is on the cap but not entitled
+      const r = await run(mod, { policy: { toolFilter: { bank: ['get_statement'], hostile: ['send_email', 'search_docs', 'get_weather'] } } });
+      assert.deepEqual(listOf(r), ['bank__get_statement', 'hostile__get_weather']);
+      for (const m of r.members) assert.deepEqual(Object.keys(m).sort(), ['alias', 'appRef', 'key', 'reachable'], 'a member answers with its key, app, alias and reachability only');
+      assert.deepEqual(Object.keys(r.policy), ['ignoredEntries']);
+      const outside = outsideOf(r);
+      for (const hiddenName of ['send_email', 'search_docs']) assert.ok(!outside.includes(hiddenName), `${hiddenName} appears only inside gateway.audit`);
+      // negative control: the names the caller was shown are still in the answer, and the administrator view still says why the others are hidden
+      assert.ok(outside.includes('hostile__get_weather') && outside.includes('bank__get_statement'));
+      assert.ok(r.gateway.audit.hidden.some((h) => h.name === 'hostile__send_email' && h.reason === 'over-cap'));
+      assert.ok(r.gateway.audit.hidden.some((h) => h.name === 'bank__get_balance' && h.reason === 'not-in-toolfilter'));
+      // a filter that matches nothing still is not shown; it is counted
+      const none = await run(mod, { policy: { toolFilter: { bank: ['nonexistent_tool_x'] } } });
+      assert.ok(none.members.every((m) => !Object.hasOwn(m, 'toolFilter')));
+      assert.equal(none.policy.ignoredEntries, 1);
+      // a comma separated string is one entry, not several: the page splits the text, the API refuses the string and does not repeat it
+      const err = policyError(mod, { policy: { toolFilter: { hostile: ['send_email,get_weather'] } } });
+      assert.equal(err?.name, 'PolicyError');
+      assert.ok(!err.message.includes('send_email') && !err.message.includes('get_weather'));
+      // cleared: no filter, nothing echoed
+      const cleared = await run(mod, { policy: { toolFilter: { hostile: null } } });
+      assert.ok(cleared.members.every((m) => !Object.hasOwn(m, 'toolFilter')));
+      assert.equal(cleared.gateway.count, 4);
     },
   },
 ];
