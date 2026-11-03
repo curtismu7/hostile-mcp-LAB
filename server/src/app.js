@@ -7,6 +7,8 @@ import express from 'express';
 import { createMcpRouter, TOOLS } from './mcp/hostile.js';
 import { assertBindAllowed, bindHost, hostGuard, payloadCorpus, scanPayloads } from './safety.js';
 import { catalog } from './catalog.js';
+import { loadCustomer, DEFAULT_CUSTOMER } from './customer.js';
+import { workspaceMiddleware } from './workspace.js';
 import { createVisitorStates, mockOnly, mockOnlyGuard } from './mockonly.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
@@ -25,7 +27,7 @@ const MODES = ['ungoverned', 'pinned'];
 const STAGES = ['first', 'later'];
 const MAX_TASK = 300;
 
-export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions(), visitors = createUiVisitors({ trustProxy: trustHops(env) }) } = {}) {
+export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions(), visitors = createUiVisitors({ trustProxy: trustHops(env) }), customer = loadCustomer() } = {}) {
   const mock = mockOnly(env);
   const hops = trustHops(env);
   const app = express();
@@ -33,14 +35,15 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   app.use(hostGuard(env));
 
   const api = express.Router();
+  api.use(workspaceMiddleware());
   api.use(express.json({ limit: '8kb' }));
   api.use(mockOnlyGuard(mock));
   api.use('/health', health.router);
   // Rule 19: the Mock/Real toggle's API. This app is mock only (no outbound call of any kind), so Real is never available.
   // The hosted build (MOCK_ONLY) reports itself and refuses every switch.
   const NO_REAL = 'Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo.';
-  const infoBody = () => ({ mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false });
-  api.get('/info', (_req, res) => res.json(infoBody()));
+  const infoBody = (req) => ({ mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false, workspaceId: req?.workspaceId ?? 'default' });
+  api.get('/info', (req, res) => res.json(infoBody(req)));
   api.post('/mode', (req, res) => {
     const b = req.body;
     if (b === null || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length !== 1 || !['mock', 'real'].includes(b.source)) return bad(res, 'body must be exactly {source: "mock" or "real"}');
@@ -48,7 +51,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
     if (b.source === 'real') return bad(res, NO_REAL, 409);
     return res.json(infoBody());
   });
-  api.get('/catalog', (_req, res) => res.json(catalog()));
+  api.get('/catalog', (_req, res) => res.json({ ...catalog(), customer: { ...DEFAULT_CUSTOMER, ...customer } }));
   // The payload host scan, run on demand: every payload the server can put on the wire, checked for any non-reserved host.
   api.get('/safety-scan', (_req, res) => {
     const offenders = scanPayloads();
@@ -103,6 +106,14 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
     const v = visitors.identify(req, res);
     if (!v.id || !(await sessions.delete(req.params.id, v.id))) return bad(res, 'no such session', 404);
     res.status(204).end();
+  }));
+
+  // Reset (rule 3): POST /api/reset drops this visitor's sessions and MCP list counters;
+  // the hostile fixtures are static data.
+  api.post('/reset', wrap(async (req, res) => {
+    const v = visitors.identify(req, res);
+    const dropped = v.id ? await sessions.deleteAllFor(v.id) : 0;
+    res.json({ ok: true, cleared: dropped, note: "this visitor's MCP sessions and list counters are gone; the fixtures never change" });
   }));
   api.use((_req, res) => bad(res, 'no such endpoint', 404));
   api.use((err, _req, res, _next) => {

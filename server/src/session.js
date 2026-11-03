@@ -88,6 +88,12 @@ export function createSessions({ max = 5000, perOwnerMax = 10, ttlMs = 15 * 60_0
       await drop(id);
       return true;
     },
+    /** Every session owned by `owner` is dropped; returns how many (rule 3 reset). */
+    async deleteAllFor(owner) {
+      const mine = [...live].filter(([, e]) => e.owner === owner).map(([id]) => id);
+      for (const id of mine) await drop(id);
+      return mine.length;
+    },
     size: () => live.size,
     sizeFor: (owner) => [...live.values()].filter((e) => e.owner === owner).length,
   };
