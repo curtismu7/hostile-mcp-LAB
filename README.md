@@ -1,6 +1,6 @@
 # Hostile MCP
 
-A deliberately hostile MCP server, an offline victim that needs no model, and a pinned client shown side by side with an ungoverned one. It tells story S05, "the tool list changed overnight": a tool you approved last week is swapped for a poisoned one.
+Tier: Demo. A deliberately hostile MCP server, an offline victim that needs no model, and a pinned client shown side by side with an ungoverned one. It tells story S05, "the tool list changed overnight": a tool you approved last week is swapped for a poisoned one.
 
 Nothing in the MCP protocol inspects tool metadata. The server serves the payloads and never scores or blocks. A defence can only sit where the metadata is consumed.
 
