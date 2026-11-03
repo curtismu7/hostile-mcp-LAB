@@ -130,3 +130,7 @@ th, td { padding: 0.5rem; border-bottom: 1px solid var(--border); text-align: le
 .gw__claims li { margin: 0.4rem 0; }
 @media (max-width: 600px) { .gw__why { grid-template-columns: 1fr; } .gw__names { columns: 1; } }
 .gw__diagram .react-flow__edge-text { font-size: 13px; }
+.mode-toggle { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.mode-toggle button { border: 0; border-radius: 0; padding: 3px 12px; background: var(--surface-2); color: var(--text); font-size: 0.85rem; cursor: default; }
+.mode-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.mode-toggle button:disabled { opacity: 0.6; }
