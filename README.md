@@ -1,8 +1,41 @@
-# Hostile MCP
+# Hostile MCP LAB
+
+Tier: Demo
 
 Tier: Demo. A deliberately hostile MCP server, an offline victim that needs no model, and a pinned client shown side by side with an ungoverned one. It tells story S05, "the tool list changed overnight": a tool you approved last week is swapped for a poisoned one.
 
+Repo: https://github.com/curtismu7/hostile-mcp-LAB
+
 Nothing in the MCP protocol inspects tool metadata. The server serves the payloads and never scores or blocks. A defence can only sit where the metadata is consumed.
+
+## Run from a clone
+
+Prerequisites: Node 26. Docker (OrbStack) only for the Docker form.
+
+```
+git clone https://github.com/curtismu7/hostile-mcp-LAB.git
+cd hostile-mcp-LAB
+npm ci
+npm run build
+npm run doctor
+npm start
+```
+
+## Ports, and what to do if the port is taken
+
+```
+Ports: hostile-mcp-LAB listens on 4701 (set with PORT, default 4701).
+Port range for this app: 4700-4799.
+
+If the port is taken:
+1. Find what is using it:
+   lsof -iTCP:4701 -sTCP:LISTEN -n -P
+2. If it is an old copy of this app, stop that process: kill <PID>.
+3. If it is something else, stop it, or start this app on another port:
+   PORT=<other port> npm start
+```
+
+Other variable: `HOST_PORT=4701` (Docker host port). Keep both inside 4700-4799.
 
 ## Release feature (simulated): entitlement filter and aggregate cap
 
