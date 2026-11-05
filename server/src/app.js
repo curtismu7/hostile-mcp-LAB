@@ -18,6 +18,7 @@ import { runScenario } from './scenario.js';
 import { PolicyError, gatewayConfigResponse, parseRequest, runGateway } from './gateway-scenario.js';
 import { CATCHES, LIMITS, reveal } from './pinning.js';
 import { VICTIM_RULES } from './victim.js';
+import { shelfInfo } from './shelfLink.js';
 
 const WEB_DIST = process.env.WEB_DIST || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -129,6 +130,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   app.use(createMcpRouter(mock ? { stateFor: createVisitorStates({ trustProxy: hops }) } : undefined));
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(WEB_DIST));
     app.get(/^\/(?!api\/|sse$|messages$|mcp$|health$).*/, (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
