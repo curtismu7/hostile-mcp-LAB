@@ -123,6 +123,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
     console.error('[hostile-mcp] api error:', err.message);
     return res.status(500).json({ error: 'server_error' });
   });
+  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
   app.use('/api', api);
 
   // Mock-only: refuse URL/credential carriers on the MCP endpoints too (their body is parsed inside the router).
@@ -130,7 +131,6 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   app.use(createMcpRouter(mock ? { stateFor: createVisitorStates({ trustProxy: hops }) } : undefined));
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
-app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(WEB_DIST));
     app.get(/^\/(?!api\/|sse$|messages$|mcp$|health$).*/, (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
