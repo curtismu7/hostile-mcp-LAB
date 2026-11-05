@@ -1,6 +1,6 @@
 # Gateway: entitlement-aware discovery and the aggregate policy cap
 
-**Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The SE gateway is v1.261030 and does not have this release. This app runs offline only: there is no Mock/Live toggle and no live path. The Gateway tab is an in-process simulation. Only after the feature is measured on a tenant may the label come off.
+**Ping release claim (2026-11-02), partially verified on our tenant (measured 2026-11-05, gateway v1.261102).** The gateway build now carries the release: the OBO exchange leg is measured working on our tenant (gateway log: `[mcpgw] obo exchange ok … (expires in 3600s)` on a test app with `AuthMode: obo`; see `AI-DEMO2-internal/privilege/OBO-REDEEM-VERIFICATION-2026-11-05.md`), and the `ToolFilter` field from the claim is present in the current console swagger (`modelMcpAggregateMember.ToolFilter`) with a live aggregate app (`aggregate-limited`) configured with per-member filters. Still UNVERIFIED at runtime: the per-call member-hop check, the aggregate policy cap (no swagger field has appeared), and the redeemed ID-JAG leg. This app runs offline only: there is no Mock/Live toggle and no live path; the Gateway tab is an in-process simulation.
 
 ## What it shows
 
@@ -22,7 +22,7 @@ A real gateway would show an administrator which tools it hid and why. The Gatew
 | Statement | Tag |
 | --- | --- |
 | `Members`, and per member `AppRef`, `Alias`, `ToolFilter` (`modelMcpAggregateMembers`, `modelMcpAggregateMember`, `Members` on `modelMcpAppConfig`); `AppType` `mcp-aggregate`; names `Alias__tool`. Already in the 2026-10-26 schema, not new. | console swagger name, 2026-10-31, schema only |
-| The listing is filtered by the caller's entitlements | Ping release claim (deck slides 36 and 37), UNVERIFIED; no swagger field; modelled as the lab-invented allow-list `entitled` |
+| The listing is filtered by the caller's entitlements | Ping release claim (deck slides 36 and 37); the `ToolFilter` field now exists in the swagger (`modelMcpAggregateMember.ToolFilter`, measured 2026-11-05) and a live aggregate app carries per-member filters; runtime filtering of a caller's listing still UNVERIFIED (blocked by the AI-policy layer); the lab models the caller-entitlement aspect as the lab-invented allow-list `entitled` |
 | One policy cap, enforced on the listing and again at the member hop | Ping release claim, UNVERIFIED; no swagger field; modelled as the lab-invented allow-list `capAllow`. The real field name is unknown and none is invented |
 | Unreachable member reported, not dropped | deck claim, lab reading |
 | ToolFilter is an allow-list, empty means no limit | lab reading (the schema gives only the type) |
