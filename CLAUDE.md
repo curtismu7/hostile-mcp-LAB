@@ -1,6 +1,6 @@
 # CLAUDE.md: Hostile MCP LAB
 
-Tier: Demo. A deliberately hostile MCP server (11 tools, one resource, one prompt — the wire output checked byte for byte), an offline victim that needs no model, and a pinned client shown beside an ungoverned one. Story S05, "the tool list changed overnight". Node 26, Express server (`server/`), React + Vite page (`web/`), loopback only, in-memory sessions. Repo: https://github.com/ping-sandbox/hostile-mcp-LAB. Read `README.md` first; the rulebook is `~/Development/STANDALONE-RULES.md` (skill `standalone-demo`).
+Tier: Demo. A deliberately hostile MCP server (11 tools, one resource, one prompt — the wire output checked byte for byte), an offline victim that needs no model, and a pinned client shown beside an ungoverned one. Story S05, "the tool list changed overnight". Node 26, Express server (`server/`), React + Vite page (`web/`), loopback only, in-memory sessions. Repo: https://github.com/curtismu7/hostile-mcp-LAB. Read `README.md` first; the rulebook is `~/Development/STANDALONE-RULES.md` (skill `standalone-demo`).
 
 ## Run and test
 - `npm ci`, `npm test` (server + web + script tests), `npm run doctor`, `npm start`. Docker: `docker compose up --build -d`, publishes `127.0.0.1` only.
