@@ -39,7 +39,7 @@ test("a skip link is the first tab stop, then the nav in order, then the toolbar
   const user = userEvent.setup();
   const order = [];
   for (let i = 0; i < 8; i++) { await user.tab(); order.push(document.activeElement.textContent); }
-  expect(order).toEqual(["Skip to content", ...PAGES.map(([, l]) => l), "Present", "Theme: system"].slice(0, 8));
+  expect(order).toEqual(["Skip to content", ...PAGES.map(([, l]) => l), "Present", "Theme"].slice(0, 8));
   await user.click(screen.getByRole("link", { name: "Skip to content" }));
   expect(document.activeElement).toBe(document.getElementById("main"));
   expect(window.location.hash).toBe("");
@@ -51,9 +51,9 @@ test("the presenter toggle and the theme button set their flags on the document"
   expect(document.documentElement.dataset.present).toBe("1");
   await userEvent.click(screen.getByRole("button", { name: "Present" }));
   expect(document.documentElement.dataset.present).toBeUndefined();
-  await userEvent.click(screen.getByRole("button", { name: /Theme/ }));
+  await userEvent.selectOptions(screen.getByTestId("theme"), "light");
   expect(document.documentElement.dataset.theme).toBe("light");
-  await userEvent.click(screen.getByRole("button", { name: /Theme/ }));
+  await userEvent.selectOptions(screen.getByTestId("theme"), "dark");
   expect(document.documentElement.dataset.theme).toBe("dark");
 });
 
