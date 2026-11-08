@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-4701}:4701"
     environment:
-      SHELF_URL: ${SHELF_URL:-}
+      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       NODE_ENV: production
       PORT: "4701"
       HOSTILE_BIND: 0.0.0.0
