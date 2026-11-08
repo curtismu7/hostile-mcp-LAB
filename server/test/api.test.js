@@ -189,3 +189,18 @@ test('the MCP endpoints still answer next to the API', () => withServer(async ({
   assert.deepEqual(h, { ok: true, tools: 11 });
   assert.equal((await get('/api/nope')).status, 404);
 }));
+
+test('GET /api/shelf is reachable with no web build: returns the SHELF_URL (trailing slash trimmed); POST is not 200', async () => {
+  const before = process.env.SHELF_URL;
+  process.env.SHELF_URL = 'https://shelf.example:8443/';
+  try {
+    await withServer(async ({ base, get, post }) => {
+      const r = await get('/api/shelf');
+      assert.equal(r.status, 200);
+      assert.deepEqual(await r.json(), { shelfUrl: 'https://shelf.example:8443' });
+      assert.notEqual((await post('/api/shelf', {})).status, 200);
+    });
+  } finally {
+    if (before === undefined) delete process.env.SHELF_URL; else process.env.SHELF_URL = before;
+  }
+});
