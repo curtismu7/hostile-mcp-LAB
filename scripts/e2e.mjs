@@ -164,7 +164,8 @@ try {
       for (const n of document.querySelectorAll('.react-flow__node')) {
         const r = n.getBoundingClientRect();
         const x = r.left + r.width / 2, y = r.top + r.height / 2;
-        if (x > c.left + 10 && x < c.right - 10 && y > c.top + 10 && y < c.bottom - 10) return { id: n.dataset.id, x, y };
+        // 5px in from the edge: since the 11-06 stylesheet re-vendor the phone canvas is 283px wide and the gateway box centre sits exactly 10px in.
+        if (x > c.left + 5 && x < c.right - 5 && y > c.top + 5 && y < c.bottom - 5) return { id: n.dataset.id, x, y };
       }
       return null;
     });
