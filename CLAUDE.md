@@ -15,7 +15,7 @@ Tier: Demo. A deliberately hostile MCP server (11 tools, one resource, one promp
 - Story text uses cast tokens (`{{lena}}`, `{{vocab.org}}`) filled from the vertical pack (`web/src/data/verticals/`); a customer persona overrides a cast name. No real customer names.
 - Node 26 only. CI is GitHub-hosted. Docker is OrbStack, never Docker Desktop. The secrets gate runs in CI with the owner's secret.
 - Never edit the shared `~/Development/AI-DEMO2` checkout; it is a read-only source.
-- Commits end with the Co-Authored-By line from the session's attribution reminder.
+- No AI attribution anywhere (owner, 2026-11-07): no Co-Authored-By trailer and no "Generated with" line in commits, PR bodies or files; CI runs `scripts/check-no-ai-attribution.sh`.
 
 ## Shelf
 `docs/shelf-entry.json` registers this app. Run the parent's `scripts/check-drift.sh <this clone>` before a PR.
