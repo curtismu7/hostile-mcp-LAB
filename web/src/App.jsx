@@ -7,7 +7,7 @@ import Limits from "./pages/Limits.jsx";
 import Diagram from "./pages/Diagram.jsx";
 import Gateway from "./pages/Gateway.jsx";
 import { getHealth, getInfo, setMode } from "./lib/api.js";
-import ModeToggle from "./components/ModeToggle.jsx";
+import TopMenu from "./top-menu/TopMenu";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
 export const PAGES = [
@@ -64,21 +64,19 @@ export default function App() {
       {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
       <header className="top">
         <h1>Hostile MCP</h1>
-        <ModeToggle info={info} onSelect={selectMode} />
+        <TopMenu
+          mode={{ value: info?.source === "real" ? "real" : "mock", onChange: selectMode, realAvailable: info ? info.realAvailable === true : false, realHint: "Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo." }}
+          theme={{ value: theme === "system" ? "auto" : theme, onChange: (t) => setThemeValue(t === "auto" ? "system" : t) }}
+          present={{ active: present, onToggle: togglePresent, label: "Present" }}
+          talkTrack={{ active: present, onToggle: togglePresent }}
+          help={{ href: "https://github.com/curtismu7/hostile-mcp-LAB#readme" }}
+          version={info?.version || null}
+        >
+          <ShelfLink />
+        </TopMenu>
         <nav aria-label="Pages">
           {PAGES.map(([id, label]) => <a key={id} href={`#/${id}`} aria-current={id === page ? "page" : undefined}>{label}</a>)}
         </nav>
-        <div className="tools-right">
-            <ShelfLink />
-          <button type="button" className="btn" aria-pressed={present} onClick={togglePresent}>Present</button>
-          <label className="inline">Theme
-            <select value={theme} onChange={(e) => setThemeValue(e.target.value)} data-testid="theme">
-              <option value="system">Auto</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
-        </div>
       </header>
       <main className="page" id="main" tabIndex={-1}>
         <Page present={present} theme={theme} />

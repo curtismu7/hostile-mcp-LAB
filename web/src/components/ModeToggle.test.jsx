@@ -48,9 +48,9 @@ describe("Mock/Real toggle (rule 19)", () => {
       return { ok: false, status: 404, json: async () => ({}) };
     });
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId("mode-real")).toHaveAttribute("aria-pressed", "true"));
-    fireEvent.click(screen.getByTestId("mode-mock"));
-    await waitFor(() => expect(screen.getByTestId("mode-mock")).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
+    fireEvent.change(screen.getByTestId("mode-select"), { target: { value: "mock" } });
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("mock"));
     expect(JSON.parse(calls.find((c) => c.url === "/api/mode").body)).toEqual({ source: "mock" });
   });
 });

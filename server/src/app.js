@@ -43,7 +43,7 @@ export function createApp({ env = process.env, health = createHealth({ env }), s
   // Rule 19: the Mock/Real toggle's API. This app is mock only (no outbound call of any kind), so Real is never available.
   // The hosted build (MOCK_ONLY) reports itself and refuses every switch.
   const NO_REAL = 'Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo.';
-  const infoBody = (req) => ({ mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false, workspaceId: req?.workspaceId ?? 'default' });
+  const infoBody = (req) => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false, workspaceId: req?.workspaceId ?? 'default' });
   api.get('/info', (req, res) => res.json(infoBody(req)));
   api.post('/mode', (req, res) => {
     const b = req.body;
