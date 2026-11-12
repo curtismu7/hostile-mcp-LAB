@@ -6,7 +6,7 @@ import RugPull from "./pages/RugPull.jsx";
 import Limits from "./pages/Limits.jsx";
 import Diagram from "./pages/Diagram.jsx";
 import Gateway from "./pages/Gateway.jsx";
-import { getHealth, getInfo, setMode } from "./lib/api.js";
+import { getHealth, getInfo, resetSessions, setMode } from "./lib/api.js";
 import TopMenu from "./top-menu/TopMenu";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
@@ -50,6 +50,8 @@ export default function App() {
 
   const setThemeValue = (t) => { setTheme(t); write("hostile.theme", t); };
   const togglePresent = () => { write("hostile.present", present ? "0" : "1"); setPresent(!present); };
+  const [notice, setNotice] = useState("");
+  const reset = async () => { try { await resetSessions(); setNotice("Reset: your MCP sessions and list counters are gone; the fixtures never change."); } catch { setNotice("Reset failed."); } };
   const Page = PAGES.find(([id]) => id === page)[2];
 
   return (
@@ -71,6 +73,7 @@ export default function App() {
           talkTrack={{ active: present, onToggle: togglePresent }}
           help={{ href: "https://github.com/curtismu7/hostile-mcp-LAB#readme" }}
           version={info?.version || null}
+          onReset={reset}
         >
           <ShelfLink />
         </TopMenu>
@@ -80,6 +83,7 @@ export default function App() {
       </header>
       <main className="page" id="main" tabIndex={-1}>
         <Page present={present} theme={theme} />
+        {notice && <p className="muted small" role="status" data-testid="notice">{notice}</p>}
         <p className="muted small" data-admin-only>The server serves payloads and never scores or blocks. Pinning notices change; it does not judge content.</p>
       </main>
     </>

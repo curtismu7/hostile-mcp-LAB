@@ -18,5 +18,6 @@ export const endSession = (id) => request(`/api/mcp-session/${id}`, { method: "D
 export const getHealth = () => request("/api/health");
 export const getInfo = () => request("/api/info");
 export const setMode = (source) => post("/api/mode", { source });
+export const resetSessions = () => post("/api/reset");
 export const getGatewayConfig = () => request("/api/gateway/config");
 export const runGateway = (body) => post("/api/gateway/run", body);
