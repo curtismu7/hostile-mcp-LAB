@@ -18,7 +18,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const shots = path.join(root, '.data', 'e2e-screenshots');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
-const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) failures++; };
+const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) console.log('   DBG activeElement:', global.__lastActive || '(n/a)'); if (!ok) failures++; };
 
 const given = process.argv.slice(2).find((a) => a.startsWith('http'));
 const port = Number(process.env.E2E_PORT) || 4743;
@@ -27,7 +27,8 @@ const base = given ? given.replace(/\/$/, '') : `http://127.0.0.1:${port}`;
 let server;
 if (!given) {
   if (!fs.existsSync(path.join(root, 'web', 'dist', 'index.html'))) { console.error('Run `npm run build` first.'); process.exit(2); }
-  server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env: { ...process.env, PORT: String(port), HOSTILE_BIND: '' }, stdio: 'ignore' });
+  // An empty HOSTILE_ALLOWED_HOSTS list = the Host guard passes everything through (the e2e talks to 127.0.0.1).
+  server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env: { ...process.env, PORT: String(port), HOSTILE_BIND: '', HOSTILE_ALLOWED_HOSTS: '' }, stdio: 'ignore' });
   for (let i = 0; i < 40; i++) { try { if ((await fetch(`${base}/api/health`)).ok) break; } catch { /* not up yet */ } await sleep(250); }
 }
 fs.rmSync(shots, { recursive: true, force: true });
@@ -44,13 +45,17 @@ try {
   // Keyboard order: the skip link is the first stop, then the nav in order; Enter on it moves focus to <main>.
   await go('gallery');
   await page.keyboard.press('Tab');
-  check((await page.evaluate(() => document.activeElement.textContent)) === 'Skip to content', 'the first Tab stop is the skip link');
+    check((await page.evaluate(() => document.activeElement.textContent)) === 'Skip to content', 'the first Tab stop is the skip link');
   await page.keyboard.press('Enter');
   check(await page.evaluate(() => document.activeElement.id) === 'main', 'the skip link moves focus to the main region');
   await go('gallery');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  check((await page.evaluate(() => document.activeElement.textContent)) === 'Gallery', 'the next Tab stop after the skip link is the first nav link');
+  // The shared TopMenu adds controls before the page nav; walk Tab until the first nav link (bounded).
+  let navReached = false;
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press('Tab');
+    if ((await page.evaluate(() => document.activeElement?.textContent)) === 'Gallery') { navReached = true; break; }
+  }
+  check(navReached, 'Tab reaches the first nav link (Gallery)');
 
   // Gallery
   await go('gallery');
@@ -117,14 +122,14 @@ try {
   await page.getByTestId('limit-first-list-poison').waitFor();
   await shot('4-limits');
   await go('diagram');
-  await page.getByRole('button', { name: 'Simulate' }).click();
+  await page.getByRole('button', { name: 'Simulate' }).last().click();
   await sleep(1500);
-  await page.getByRole('button', { name: 'Reset' }).click();
+  await page.getByRole('button', { name: 'Reset' }).last().click();
   await shot('5-diagram');
 
   // Gateway tab: the claim banner, the demo audit pane, and a real drag that Reset undoes (jsdom cannot drag).
   await go('gateway');
-  await page.getByRole('button', { name: 'Simulate' }).and(page.locator(':enabled')).waitFor({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Simulate' }).last().and(page.locator(':enabled')).waitFor({ timeout: 20000 });
   check((await page.getByTestId('claim-banner').innerText()).includes('UNVERIFIED on our tenant'), 'gateway tab carries the release-claim banner');
   check((await page.getByTestId('gw-audit').innerText()).includes('Demo audit pane'), 'gateway tab labels the hidden list as a demo audit pane');
   const gwBox = async () => { const b = await page.locator('.react-flow__node[data-id="gw"]').boundingBox(); return { x: b.x, y: b.y }; };
@@ -136,7 +141,7 @@ try {
   await page.mouse.up();
   const dragged = await gwBox();
   check(Math.abs(dragged.y - before.y) > 40, `a dragged box stays where it was dropped (moved ${Math.round(dragged.y - before.y)}px)`);
-  await page.getByRole('button', { name: 'Reset' }).click();
+  await page.getByRole('button', { name: 'Reset' }).last().click();
   await sleep(500);
   const restored = await gwBox();
   check(Math.abs(restored.x - before.x) < 2 && Math.abs(restored.y - before.y) < 2, 'Reset puts the dragged box back');
