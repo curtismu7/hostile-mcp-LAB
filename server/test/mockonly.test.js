@@ -4,6 +4,7 @@ import http from 'node:http';
 import test from 'node:test';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import { allPassed, runChecks } from '../src/doctor.js';
 import { createSessions } from '../src/session.js';
 import { createVisitorStates, mockOnly } from '../src/mockonly.js';
 import { __resetRugPullForTests } from '../src/mcp/hostile.js';
@@ -11,7 +12,7 @@ import { bindHost } from '../src/safety.js';
 import { guardNetwork } from './netguard.js';
 
 async function withServer(env, fn) {
-  const health = createHealth({ env });
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env }), allPassed, mockOnly, env });
   const server = await startHttpServer(0, '127.0.0.1', { env, health, sessions: createSessions() });
   const base = `http://127.0.0.1:${server.port}`;
   const post = (path, body, headers = {}) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
@@ -145,7 +146,7 @@ const getWithHost = (port, host) => new Promise((resolve, reject) => {
 
 test('hosted mock: HOSTILE_BIND + HOSTILE_ALLOWED_HOSTS serve the allowed Host and reject others with 421', async () => {
   const env = { MOCK_ONLY: '1', HOSTILE_BIND: '0.0.0.0', HOSTILE_ALLOWED_HOSTS: 'mock.hostile.test, other.hostile.test' };
-  const health = createHealth({ env });
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env }), allPassed, mockOnly, env });
   const server = await startHttpServer(0, bindHost(env), { env, health, sessions: createSessions() });
   try {
     assert.equal(await getWithHost(server.port, 'mock.hostile.test'), 200);

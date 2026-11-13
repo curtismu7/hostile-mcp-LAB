@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import { allPassed, runChecks } from '../src/doctor.js';
+import { mockOnly } from '../src/mockonly.js';
 import { createSessions } from '../src/session.js';
 import { guardNetwork } from './netguard.js';
 
 async function withServer(fn, opts) {
-  const health = createHealth();
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env: {} }), allPassed, mockOnly });
   const server = await startHttpServer(0, '127.0.0.1', { health, sessions: createSessions(), ...opts });
   const base = `http://127.0.0.1:${server.port}`;
   let cookie = ''; // one browser: carries the server-minted visitor cookie

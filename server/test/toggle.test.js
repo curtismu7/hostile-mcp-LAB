@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import { allPassed, runChecks } from '../src/doctor.js';
+import { mockOnly } from '../src/mockonly.js';
 import { createSessions } from '../src/session.js';
 
 async function withServer(env, fn) {
-  const health = createHealth({ env });
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env }), allPassed, mockOnly, env });
   const server = await startHttpServer(0, '127.0.0.1', { env, health, sessions: createSessions() });
   const base = `http://127.0.0.1:${server.port}`;
   const get = async (p) => { const r = await fetch(base + p); return { status: r.status, json: await r.json() }; };

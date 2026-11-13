@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import express from 'express';
 import { allPassed, runChecks } from '../src/doctor.js';
+import { mockOnly } from '../src/mockonly.js';
 import { createHealth } from '../src/health.js';
 
 async function serve(health, fn) {
@@ -13,7 +14,7 @@ async function serve(health, fn) {
 }
 
 test('demo-health/1: exact fields, public, no-store', async () => {
-  await serve(createHealth({ now: () => new Date('2026-10-21T12:00:00.000Z') }), async (url) => {
+  await serve(createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks, allPassed, mockOnly, now: () => new Date('2026-10-21T12:00:00.000Z') }), async (url) => {
     const res = await fetch(url);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /application\/json/);
@@ -32,7 +33,7 @@ test('demo-health/1: exact fields, public, no-store', async () => {
 });
 
 test('GET only', async () => {
-  await serve(createHealth(), async (url) => {
+  await serve(createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks, allPassed, mockOnly }), async (url) => {
     for (const method of ['POST', 'PUT', 'DELETE']) {
       const r = await fetch(url, { method });
       assert.equal(r.status, 405, method);
@@ -45,7 +46,7 @@ test('the state is cached: requests never run the checks, a refresh does', async
   let runs = 0;
   let ok = true;
   const runChecks2 = () => { runs += 1; return [{ id: 'x', level: ok ? 'pass' : 'fail', detail: '' }]; };
-  const health = createHealth({ runChecks: runChecks2 });
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: runChecks2, allPassed, mockOnly });
   assert.equal(runs, 1, 'one check at startup');
   await serve(health, async (url) => {
     const before = runs;
@@ -65,7 +66,7 @@ test('the background timer is 60 seconds and runs the same refresh', () => {
   const real = globalThis.setInterval;
   globalThis.setInterval = (fn, ms) => { timers.push({ fn, ms }); return real(fn, ms); };
   let health;
-  try { health = createHealth({ runChecks: () => { runs += 1; return []; } }); } finally { globalThis.setInterval = real; }
+  try { health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => { runs += 1; return []; }, allPassed, mockOnly }); } finally { globalThis.setInterval = real; }
   assert.deepEqual(timers.map((t) => t.ms), [60_000]);
   timers[0].fn();
   assert.equal(runs, 2, 'startup check plus one timer tick');
@@ -73,7 +74,7 @@ test('the background timer is 60 seconds and runs the same refresh', () => {
 });
 
 test('a throwing check reports unknown, not a crash', async () => {
-  await serve(createHealth({ runChecks: () => { throw new Error('boom'); } }), async (url) => {
+  await serve(createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => { throw new Error('boom'); }, allPassed, mockOnly }), async (url) => {
     assert.equal((await (await fetch(url)).json()).state, 'unknown');
   });
 });

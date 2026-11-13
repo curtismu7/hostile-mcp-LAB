@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import { allPassed, runChecks } from '../src/doctor.js';
+import { mockOnly } from '../src/mockonly.js';
 import { createSessions } from '../src/session.js';
 import { createUiVisitors } from '../src/uivisitor.js';
 import { createVisitorStates } from '../src/mockonly.js';
@@ -10,7 +12,7 @@ import { clientSource, trustHops } from '../src/source.js';
 import { assertBindAllowed } from '../src/safety.js';
 
 async function withServer(opts, fn) {
-  const health = createHealth();
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env: {} }), allPassed, mockOnly });
   const server = await startHttpServer(0, '127.0.0.1', { health, ...opts });
   const base = `http://127.0.0.1:${server.port}`;
   // A "browser": its own cookie jar.

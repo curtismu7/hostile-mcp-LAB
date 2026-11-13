@@ -10,6 +10,7 @@ import { catalog } from './catalog.js';
 import { loadCustomer, DEFAULT_CUSTOMER } from './customer.js';
 import { workspaceMiddleware } from './workspace.js';
 import { createVisitorStates, mockOnly, mockOnlyGuard } from './mockonly.js';
+import { allPassed, runChecks } from './doctor.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
 import { createUiVisitors } from './uivisitor.js';
@@ -28,7 +29,18 @@ const MODES = ['ungoverned', 'pinned'];
 const STAGES = ['first', 'later'];
 const MAX_TASK = 300;
 
-export function createApp({ env = process.env, health = createHealth({ env }), sessions = createSessions(), visitors = createUiVisitors({ trustProxy: trustHops(env) }), customer = loadCustomer() } = {}) {
+const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const defaultHealth = (env = process.env) => createHealth({
+  demoId: 'hostile-mcp',
+  demoName: 'Hostile MCP',
+  version,
+  runChecks: () => runChecks({ env }),
+  allPassed,
+  mockOnly,
+  env,
+});
+
+export function createApp({ env = process.env, health = defaultHealth(env), sessions = createSessions(), visitors = createUiVisitors({ trustProxy: trustHops(env) }), customer = loadCustomer() } = {}) {
   const mock = mockOnly(env);
   const hops = trustHops(env);
   const app = express();

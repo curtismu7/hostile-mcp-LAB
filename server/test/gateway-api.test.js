@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import { allPassed, runChecks } from '../src/doctor.js';
+import { mockOnly } from '../src/mockonly.js';
 import { createSessions } from '../src/session.js';
 import { guardNetwork } from './netguard.js';
 
@@ -14,7 +16,7 @@ const SECRET = 'SECRET_TOKEN_123';
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
 
 async function withServer(fn, env = {}) {
-  const health = createHealth({ env });
+  const health = createHealth({ demoId: 'hostile-mcp', demoName: 'Hostile MCP', version: '0.1.0', runChecks: () => runChecks({ env }), allPassed, mockOnly, env });
   const server = await startHttpServer(0, '127.0.0.1', { env, health, sessions: createSessions() });
   const base = `http://127.0.0.1:${server.port}`;
   const post = (p, body, headers = {}) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
