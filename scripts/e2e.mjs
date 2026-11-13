@@ -18,7 +18,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const shots = path.join(root, '.data', 'e2e-screenshots');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
-const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) console.log('   DBG activeElement:', global.__lastActive || '(n/a)'); if (!ok) failures++; };
+const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) failures++; };
 
 const given = process.argv.slice(2).find((a) => a.startsWith('http'));
 const port = Number(process.env.E2E_PORT) || 4743;
