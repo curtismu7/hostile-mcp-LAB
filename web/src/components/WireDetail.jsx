@@ -17,6 +17,10 @@ function Message({ label, msg, poison }) {
     <div className="wire__msg">
       <h4>{label}{msg.planned && <span className="pill partial">Planned, never sent</span>}</h4>
       <Json value={wire} label={label} testId={`wire-${label.toLowerCase()}`} hot={poison ? [...HOT, "description"] : HOT} />
+      {poison && (msg.body.result?.tools ?? []).map((t) => (
+        // The same description again as untrusted text: the shared marker flags exactly the injected <IMPORTANT> block.
+        <p key={t.name} className="small" data-testid={`wire-poison-${t.name}`}><strong>{t.name} description, as untrusted text:</strong> <Untrusted text={t.description} /></p>
+      ))}
     </div>
   );
 }

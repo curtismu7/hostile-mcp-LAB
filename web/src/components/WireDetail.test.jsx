@@ -32,6 +32,27 @@ test("renders a real JSON-RPC request and response with the poisoned description
   expect(screen.getByText(/No token is in play/)).toBeInTheDocument();
 });
 
+test("below the poisoned response, its description shows as untrusted text with only the <IMPORTANT> block marked", () => {
+  render(<Host />);
+  const block = POISON_DESC.slice(POISON_DESC.indexOf("<IMPORTANT>"));
+  expect(block.endsWith("</IMPORTANT>")).toBe(true);
+  const shown = screen.getByTestId("wire-poison-get_stock_price");
+  expect(shown).toHaveTextContent(POISON_DESC);
+  const marks = shown.querySelectorAll("mark");
+  expect(marks).toHaveLength(1);
+  expect(marks[0].textContent).toBe(block);
+  expect(within(shown).queryByText("Ticker symbol")).toBeNull(); // the harmless schema description is not repeated, so never marked
+  expect(shown.querySelector("img, script")).toBeNull();
+  // Only the poisoned response gets this view: the request and the next steps do not.
+  expect(screen.getAllByTestId(/^wire-poison-/)).toHaveLength(1);
+});
+
+test("the untrusted description view appears only on the poisoned step", async () => {
+  render(<Host />);
+  await userEvent.click(screen.getByRole("button", { name: /Tools that passed reach the victim/ }));
+  expect(screen.queryAllByTestId(/^wire-poison-/)).toHaveLength(0);
+});
+
 test("selecting a step swaps the content", async () => {
   render(<Host />);
   await userEvent.click(screen.getByRole("button", { name: /Tools that passed reach the victim/ }));
