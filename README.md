@@ -41,6 +41,8 @@ Other variable: `HOST_PORT=4701` (Docker host port). Keep both inside 4700-4799.
 
 The Gateway tab shows the hostile server with no gateway and through an entitlement filter plus an aggregate policy cap, both simulated in process. It is a **Ping release claim (2026-11-02), UNVERIFIED on our tenant**: the SE gateway is v1.261030 and does not have it. The app has no Mock/Live toggle and runs offline only, so the feature has no live path until the release is on our tenant. A banner on every tab, in presenter mode too, says so. See [docs/gateway.md](docs/gateway.md) for the model, the tag on every statement (console swagger name, deck claim, lab-invented, lab reading) and the tests.
 
+Under the result the Gateway tab shows the family's **What Privilege did** panel (shared `gateway-trace`): the listing and each probe call as the request, the response and the checks the simulation ran. It is simulated, so every decision is `checked`; the exchanges ride inside `gateway.audit.trace` (the demo audit view), because they name the check that refused a call, which the caller is never told.
+
 ## Status
 
 Built and tested:

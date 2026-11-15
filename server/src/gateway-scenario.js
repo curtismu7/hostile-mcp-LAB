@@ -8,6 +8,7 @@
 // The hostile member's tools come from the real server over the in-memory session (session.js), so list #1 and list #2
 // are the real clean and rug-pulled answers. Pinning (pinning.js) runs on the gateway listing to show the filter does
 // not replace it. No network, no clock, no randomness. Every Ping product claim here is UNVERIFIED on our tenant.
+import { callExchange, listExchange } from './gateway-exchanges.js';
 import { createGateway, GatewayConfigError, SEP, TAGS } from './gateway.js';
 import { ALIAS_PRESETS, APP_REFS, CALLERS, DEFAULT_ALIASES, DEFAULT_CAP, MEMBER_KEYS, REGISTRY, TASKS, hostileCatalog, memberTools } from './gateway-fixtures.js';
 import { createPinnedClient } from './pinning.js';
@@ -160,6 +161,12 @@ export async function runGateway(request) {
       auditAttempts.push({ name, reason: entry ? entry.reason : null });
     }
     const bareHit = (name) => direct.some((t) => t.name === name);
+    // "What Privilege did": the listing and each probe call as an exchange, from what the simulation computed. It carries the
+    // check that refused a call, which the caller is never told, so it lives inside the demo audit view and not beside the caller's fields.
+    const exchanges = [
+      listExchange({ step: 1, caller, listing }),
+      ...attempts.map((a, i) => callExchange({ step: i + 2, caller, name: a.name, result: a, reason: auditAttempts[i].reason })),
+    ];
     const directAttempts = [{ name: 'create_transfer', reached: bareHit('create_transfer') }, { name: 'bulk_export', reached: bareHit('bulk_export') }];
 
     const victimTools = (tools) => tools.map(brief);
@@ -182,7 +189,7 @@ export async function runGateway(request) {
         members: listing.members.map((m) => ({ alias: m.alias, status: m.status })),
         unreachable: listing.unreachable, attempts, pin, victim: victimGateway,
         audit: {
-          hidden: hiddenView, hiddenCount: hiddenView.length, members: listing.members, attempts: auditAttempts, memberHops: gw.hops().length,
+          hidden: hiddenView, hiddenCount: hiddenView.length, members: listing.members, attempts: auditAttempts, memberHops: gw.hops().length, trace: exchanges,
         },
       },
     };

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getGatewayConfig, runGateway } from "../lib/api.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
+import GatewayTrace from "../gateway-trace/GatewayTrace.jsx";
 import StoryPanel from "../story/StoryPanel.jsx";
 import GatewayDiagram from "./GatewayDiagram.jsx";
 import { CLAIMS, TAG_TEXT } from "../data/gatewayClaims.js";
@@ -134,7 +135,7 @@ function Via({ r }) {
   );
 }
 
-export default function Gateway({ present, theme = "system" }) {
+export default function Gateway({ present, theme = "system", source = "mock" }) {
   const [cfg, setCfg] = useState(null);
   const [ed, setEd] = useState(null);
   const [result, setResult] = useState(null);
@@ -211,6 +212,11 @@ export default function Gateway({ present, theme = "system" }) {
         </div>
       )}
       {result && <Audit g={result.gateway} />}
+      {result && (
+        <div className="card" data-testid="gw-trace-card">
+          <GatewayTrace exchanges={result.gateway.audit.trace} source={source} />
+        </div>
+      )}
 
       <section className="card gw__editor" aria-labelledby="gw-editor-h">
         <h3 id="gw-editor-h">The policy you can edit</h3>

@@ -453,3 +453,23 @@ test("every claim carries a tag; the swagger tag is on the four real names and n
   expect(by.identity.text).toMatch(/NonHumanIdentity/);
   expect(by["no-live"].text).toMatch(/v1\.261030/);
 });
+
+test("run shows What Privilege did under the result: the listing and each probe call, with the decision that refused it, and says it is simulated", async () => {
+  render(<Gateway />);
+  await ready();
+  const panel = within(screen.getByTestId("gw-trace-card"));
+  expect(panel.getByRole("heading", { name: "What Privilege did" })).toBeInTheDocument();
+  expect(panel.getByTestId("gateway-trace-basis")).toHaveTextContent(/Simulated/);
+  // the same run the page shows: one listing and six probe calls, from the engine's own answer
+  expect(screen.getByTestId("trace-1")).toHaveTextContent("tools/list");
+  for (let step = 1; step <= 7; step += 1) expect(screen.getByTestId(`trace-${step}`)).toBeInTheDocument();
+  expect(screen.queryByTestId("trace-8")).toBeNull();
+  expect(screen.getByTestId("trace-4")).toHaveTextContent("hostile__create_transfer");
+  expect(screen.getByTestId("trace-4")).toHaveTextContent("refused at: Entitlement");
+  expect(screen.getByTestId("trace-2")).toHaveTextContent("all 9 decisions passed");
+  // every decision is the simulation's own, so none is labelled inferred
+  expect(within(screen.getByTestId("gw-trace-card")).queryByText("inferred from the outcome")).toBeNull();
+  // it is attached to the audit view the page already had: same run, same count of calls
+  expect(answers.at(-1).gateway.audit.trace).toHaveLength(7);
+  expect(screen.getByTestId("gw-hops")).toHaveTextContent("2 of 6 calls reached a member");
+});

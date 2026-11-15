@@ -82,7 +82,7 @@ export default function App() {
         </nav>
       </header>
       <main className="page" id="main" tabIndex={-1}>
-        <Page present={present} theme={theme} />
+        <Page present={present} theme={theme} source={info?.source === "real" ? "real" : "mock"} />
         {notice && <p className="muted small" role="status" data-testid="notice">{notice}</p>}
         <p className="muted small" data-admin-only>The server serves payloads and never scores or blocks. Pinning notices change; it does not judge content.</p>
       </main>
