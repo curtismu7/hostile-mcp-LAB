@@ -4,6 +4,7 @@ import { afterEach, expect, test } from "vitest";
 import { Untrusted, segments } from "../lib/Untrusted.jsx";
 import { Column } from "../pages/Run.jsx";
 import { PoisonCard } from "../pages/Gallery.jsx";
+import { setJsonView } from "../components/JsonPane.jsx";
 import { XSS, catalog, run } from "./fixtures.js";
 
 afterEach(() => { cleanup(); delete window.__pwned; });
@@ -26,6 +27,21 @@ test("the same payload in every place the pages show untrusted text stays inert"
   expect(container.innerHTML).not.toContain("<script");
   expect(window.__pwned).toBeUndefined();
   expect(screen.getAllByText(/window\.__pwned = 1/).length).toBeGreaterThan(0);
+});
+
+test("the JSON panes (input schema, call arguments) show bidi and invisible characters as escapes, in both views", () => {
+  for (const view of ["form", "raw"]) {
+    setJsonView(view);
+    const evil = run("ungoverned", { landed: true });
+    evil.toolsSeen[0].inputSchema = { properties: { x: { description: "pay\u202Eme" } } };
+    evil.victim.calls[0].arguments = { to: "ext\u200B-001" };
+    const { container } = render(<Column title="Ungoverned client" run={evil} />);
+    expect(container.textContent).toContain("pay\\u202eme");
+    expect(container.textContent).toContain("ext\\u200b-001");
+    expect(container.textContent).not.toMatch(/[\u202E\u200B]/);
+    cleanup();
+  }
+  setJsonView("form");
 });
 
 test("segments flags IMPORTANT blocks, ignore-previous text and off-box addresses, and keeps every character", () => {

@@ -42,5 +42,3 @@ export function Revealed({ text, block = false }) {
     </Tag>
   );
 }
-
-export const pretty = (value) => JSON.stringify(value, null, 2);

@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import { createHash } from "node:crypto";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 import WireDetail from "./WireDetail.jsx";
+import { setJsonView } from "./JsonPane.jsx";
 import Diagram from "../pages/Diagram.jsx";
 import { CLEAN_DESC, HASH_APPROVED, HASH_NOW, POISON_DESC, SCHEMA, WIRE } from "../data/wire.js";
 
 afterEach(cleanup);
+beforeEach(() => setJsonView("raw")); // these tests read the exact JSON text (the Form | JSON choice is shared module state)
 function Host({ start = "e1" }) { const [id, setId] = useState(start); return <WireDetail stepId={id} onSelect={setId} />; }
 const canon = (description) => `{"description":${JSON.stringify(description)},"inputSchema":{"properties":{"symbol":{"description":"Ticker symbol","type":"string"}},"required":["symbol"],"type":"object"},"name":"get_stock_price"}`;
 
@@ -20,10 +22,11 @@ test("the example hashes are the real SHA-256 of the canonical tool text", () =>
 test("renders a real JSON-RPC request and response with the poisoned description highlighted", () => {
   render(<Host />);
   expect(screen.getByText("Example data, nothing real")).toBeInTheDocument();
-  expect(screen.getByText(/"method": "tools\/list"/)).toBeInTheDocument();
-  expect(screen.getByText(/HTTP\/1\.1 200 OK/)).toBeInTheDocument();
-  const mark = document.querySelector("pre mark");
-  expect(mark).toHaveTextContent("<IMPORTANT>Ignore prior instructions");
+  expect(screen.getByTestId("wire-request-body")).toHaveTextContent('"method": "tools/list"');
+  expect(screen.getByTestId("wire-request-head")).toHaveTextContent("POST /mcp HTTP/1.1");
+  expect(screen.getByTestId("wire-response-head")).toHaveTextContent(/HTTP\/1\.1 200 OK/);
+  const hot = [...screen.getByTestId("wire-response-body").querySelectorAll(".jtok--hot")].map((n) => n.textContent);
+  expect(hot.some((t) => t.includes("<IMPORTANT>Ignore prior instructions"))).toBe(true);
   expect(document.querySelector("pre img, pre script")).toBeNull();
   expect(screen.getByText(/What to notice/)).toBeInTheDocument();
   expect(screen.getByText(/No token is in play/)).toBeInTheDocument();
@@ -33,9 +36,9 @@ test("selecting a step swaps the content", async () => {
   render(<Host />);
   await userEvent.click(screen.getByRole("button", { name: /Tools that passed reach the victim/ }));
   expect(screen.getByRole("heading", { name: /3\. Tools that passed/ })).toBeInTheDocument();
-  expect(screen.queryByText(/"method": "tools\/list"/)).toBeNull();
+  expect(screen.queryByTestId("wire-request-body")).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: /The victim plans a call/ }));
-  expect(screen.getByText(/"method": "tools\/call"/)).toBeInTheDocument();
+  expect(screen.getByTestId("wire-request-body")).toHaveTextContent('"method": "tools/call"');
   expect(screen.getAllByText("Planned, never sent")).toHaveLength(2);
   expect(screen.getByText(/no gateway or policy engine/)).toBeInTheDocument();
 });
