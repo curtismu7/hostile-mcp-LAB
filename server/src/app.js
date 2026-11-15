@@ -14,6 +14,7 @@ import { allPassed, runChecks } from './doctor.js';
 import { createHealth } from './health.js';
 import { createSessions } from './session.js';
 import { createUiVisitors } from './uivisitor.js';
+import { readFileSettings, doorConfig, createRealDoor } from './gatewayReal.js';
 import { trustHops } from './source.js';
 import { runScenario } from './scenario.js';
 import { PolicyError, gatewayConfigResponse, parseRequest, runGateway } from './gateway-scenario.js';
@@ -52,18 +53,40 @@ export function createApp({ env = process.env, health = defaultHealth(env), sess
   api.use(express.json({ limit: '8kb' }));
   api.use(mockOnlyGuard(mock));
   api.use('/health', health.router);
-  // Rule 19: the Mock/Real toggle's API. This app is mock only (no outbound call of any kind), so Real is never available.
-  // The hosted build (MOCK_ONLY) reports itself and refuses every switch.
-  const NO_REAL = 'Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo.';
-  const infoBody = (req) => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: false, workspaceId: req?.workspaceId ?? 'default' });
+  // Rule 19: the Mock/Real toggle's API. The hosted build (MOCK_ONLY) refuses every switch. In the local
+  // build, Real is the shared gateway hop: an agent key from the shared settings file calling the live
+  // hostile-mcp door on the SE gateway (https://mcpgw.../hostile-mcp/mcp).
+  const NO_REAL = 'Real is not configured: set HMG_GW_URL, HMG_GW_APPS (hostile-mcp, hostile-mcp-governed) and at least one HMG_GW_KEY_<NAME> in the shared settings file (~/Development/.env, or STANDALONE_ENV). Mock keeps working.';
+  const realDoorFrom = (env = process.env) => {
+    const p = env.STANDALONE_ENV || `${env.HOME || ''}/Development/.env`;
+    let text = '';
+    try { text = fs.readFileSync(p, 'utf8'); } catch { /* the environment may still carry the keys */ }
+    for (const [k, v] of Object.entries(env)) if (k.startsWith('HMG_GW_') && v) text += `\n${k}=${v}`;
+    const cfg = doorConfig(text, 'HMG');
+    return cfg.ok ? createRealDoor({ config: cfg, clientInfo: { name: 'hostile-mcp', version: '0.1.0' } }) : null;
+  };
+  const infoBody = (req) => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: mock ? 'mock-only' : 'local', hosted: mock, source: 'mock', realAvailable: !mock && Boolean(realDoorFrom()), workspaceId: req?.workspaceId ?? 'default' });
   api.get('/info', (req, res) => res.json(infoBody(req)));
   api.post('/mode', (req, res) => {
     const b = req.body;
     if (b === null || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length !== 1 || !['mock', 'real'].includes(b.source)) return bad(res, 'body must be exactly {source: "mock" or "real"}');
     if (mock) return bad(res, 'The hosted build is Mock only and cannot be switched.', 403);
-    if (b.source === 'real') return bad(res, NO_REAL, 409);
-    return res.json(infoBody());
+    if (b.source === 'real' && !realDoorFrom()) return bad(res, NO_REAL, 409);
+    return res.json({ ...infoBody(), source: b.source === 'real' ? 'real' : 'mock' });
   });
+  // One real gateway check: tools/list through the hostile-mcp door, then the governed twin's refusal shape.
+  api.post('/gateway-check', wrap(async (req, res) => {
+    const door = realDoorFrom();
+    if (!door) return bad(res, NO_REAL, 409);
+    if (req.body && Object.keys(req.body).some((k) => !['app', 'caller'].includes(k))) return bad(res, 'the only accepted body fields are { "app", "caller" }');
+    const app = String(req.body?.app || door.apps[0]);
+    if (!door.apps.includes(app)) return bad(res, `app must be one of ${door.apps.join(', ')}`);
+    const caller = req.body?.caller && door.callers.some((c) => c.id === req.body.caller) ? req.body.caller : door.callers[0].id;
+    const listing = await door.list(app, caller);
+    const out = { app, caller, gateway: door.origin, listing };
+    if (listing.ok) out.refusal = await door.call(app, caller, 'hostile_mcp_refusal_probe_tool', {});
+    res.json(out);
+  }));
   api.get('/catalog', (_req, res) => res.json({ ...catalog(), customer: { ...DEFAULT_CUSTOMER, ...customer } }));
   // The payload host scan, run on demand: every payload the server can put on the wire, checked for any non-reserved host.
   api.get('/safety-scan', (_req, res) => {
