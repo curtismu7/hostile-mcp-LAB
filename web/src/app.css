@@ -103,7 +103,6 @@ th, td { padding: 0.5rem; border-bottom: 1px solid var(--border); text-align: le
 .chip { display: inline-block; padding: 0 0.3em; border: 1px solid var(--danger-text); border-radius: 4px; background: var(--accent-soft); color: var(--danger-text); font: 0.8em var(--font-mono); }
 
 /* On the wire panel */
-.wire__pre { margin: 0; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); overflow: auto; max-height: 22rem; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .wire .seg { flex-wrap: wrap; margin: 0.4rem 0; }
 .wire__empty, .wire__notice { padding: 0.5rem 0.75rem; border-left: 4px solid var(--accent); background: var(--surface-2); border-radius: 0 6px 6px 0; }
 .wire__table .is-changed td, .wire__table .is-changed th { background: var(--surface-2); }

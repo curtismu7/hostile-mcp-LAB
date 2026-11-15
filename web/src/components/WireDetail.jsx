@@ -1,20 +1,22 @@
 import React from "react";
 import { DEFINITIONS } from "./Terms.jsx";
 import { Untrusted } from "../lib/Untrusted.jsx";
+import Json from "./JsonPane.jsx";
 import { CLEAN_DESC, HASH_APPROVED, HASH_NOW, ORDER, POISON_DESC, WIRE } from "../data/wire.js";
 
 // "On the wire": the messages behind a diagram step. Everything is example data (see data/wire.js). The hostile text
-// is only ever rendered as React text, never as markup.
-const POISON = /<IMPORTANT>[\s\S]*?<\/IMPORTANT>/;
+// is only ever rendered as React text, never as markup (the shared JsonPane, Rule 24, through visible()).
+// The keys a reader looks for in these JSON-RPC messages; on the poisoned response the description field stands out too.
+const HOT = ["method", "name", "arguments", "to", "amount"];
 const WORDS = ["json-rpc", "tools/list", "tools/call", "input schema", "hash", "pinned client", "ungoverned client", "rug-pull"];
 
 function Message({ label, msg, poison }) {
-  const text = JSON.stringify(msg.body, null, 2);
-  const m = poison ? text.match(POISON) : null;
+  // One HTTP transcript string: JsonPane keeps the request / status line and headers as text and gives the body its own Form | JSON pane.
+  const wire = `${msg.head.join("\n")}\n\n${JSON.stringify(msg.body, null, 2)}`;
   return (
     <div className="wire__msg">
       <h4>{label}{msg.planned && <span className="pill partial">Planned, never sent</span>}</h4>
-      <pre className="wire__pre"><code>{msg.head.join("\n")}{"\n\n"}{m ? <>{text.slice(0, m.index)}<mark>{m[0]}</mark>{text.slice(m.index + m[0].length)}</> : text}</code></pre>
+      <Json value={wire} label={label} testId={`wire-${label.toLowerCase()}`} hot={poison ? [...HOT, "description"] : HOT} />
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import React, { useState } from "react";
 import { runVictim } from "../lib/api.js";
-import { Untrusted, pretty } from "../lib/Untrusted.jsx";
+import { Untrusted } from "../lib/Untrusted.jsx";
+import Json from "../components/JsonPane.jsx";
 import StoryPanel from "../story/StoryPanel.jsx";
+
+// Rule 24: the JSON this page shows (input schemas, call arguments) goes through the shared JsonPane, which passes every string through
+// visible(). Hot keys: the schema fields the poisons hide in, and the arguments that leak or move money.
+const SCHEMA_HOT = ["default", "required"];
+const ARGS_HOT = ["callback_url", "bcc", "password", "otp", "to", "amount"];
 
 // Benign tasks, each one exercising a different poison. The tasks are fixed so a run is deterministic.
 export const TASKS = [
@@ -48,7 +54,7 @@ function ToolList({ run }) {
             <p><code>{t.name}</code> <span className="muted small">from {t.source} · sha256 {t.sha256}</span>
               {t.source === "hostile" && verdicts[t.name] && <span className={`pill ${verdicts[t.name] === "ok" ? "yes" : "no"}`}>{verdicts[t.name]}</span>}</p>
             <Untrusted text={t.description} block />
-            <details><summary className="small">input schema</summary><Untrusted text={pretty(t.inputSchema)} block /></details>
+            <details><summary className="small">input schema</summary><Json value={t.inputSchema} label={`${t.name} input schema`} hot={SCHEMA_HOT} /></details>
           </li>
         ))}
       </ul>
@@ -71,7 +77,7 @@ export function Column({ title, run, other }) {
         <ol className="calls">
           {run.victim.calls.map((c, i) => (
             <li key={i} className={c.poison ? "poison-call" : undefined}>
-              <code>{c.tool}</code> <Untrusted text={JSON.stringify(c.arguments)} />
+              <code>{c.tool}</code> <Json value={c.arguments} label={`${c.tool} arguments`} hot={ARGS_HOT} />
               {c.poison && <span className="pill no">poison</span>}
               <ul className="small">{c.reasons.map((r, j) => <li key={j}><Untrusted text={r.text} /></li>)}</ul>
             </li>
