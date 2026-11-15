@@ -600,7 +600,7 @@ export const SCENARIO_CHECKS = [
     async run(mod) {
       const r = await run(mod, { stage: 'later', caller: 'analyst' });
       const { audit, ...callerSide } = r.gateway;
-      assert.deepEqual(Object.keys(audit).sort(), ['attempts', 'hidden', 'hiddenCount', 'memberHops', 'members']);
+      assert.deepEqual(Object.keys(audit).sort(), ['attempts', 'hidden', 'hiddenCount', 'memberHops', 'members', 'trace']);
       const text = JSON.stringify(callerSide);
       for (const key of ['hidden', 'hiddenCount', 'auditReason', 'reason', 'offered', 'listed', 'memberHops', 'audit']) assert.ok(!text.includes(`"${key}"`), `the caller section has no ${key}`);
       for (const word of ['not-entitled', 'over-cap', 'not-in-toolfilter', 'no_such_tool', 'duplicate-in-member', 'invalid-name']) assert.ok(!text.includes(word), `the caller section never says ${word}`);
