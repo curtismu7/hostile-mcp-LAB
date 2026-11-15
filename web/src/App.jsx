@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
-import VerifyMark from "./components/VerifyMark.jsx";
 import Gallery from "./pages/Gallery.jsx";
 import Run from "./pages/Run.jsx";
 import RugPull from "./pages/RugPull.jsx";
@@ -9,6 +8,7 @@ import Diagram from "./pages/Diagram.jsx";
 import Gateway from "./pages/Gateway.jsx";
 import { getHealth, getInfo, resetSessions, setMode } from "./lib/api.js";
 import TopMenu from "./top-menu/TopMenu";
+import PrivilegeCheck from "./privilege-check/PrivilegeCheck.jsx";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
 export const PAGES = [
@@ -58,15 +58,15 @@ export default function App() {
   return (
     <>
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
-      <header className="shell-bar">
-        <span className="shell-brand">
-          <span className="shell-logo" aria-hidden="true">MCP</span>
-          <h1>Hostile MCP</h1>
-          <span className="shell-badge" data-testid="mode-badge">{info?.source === "real" ? "Real" : "Mock"}</span>
-        </span>
-        <nav className="shell-nav" aria-label="Pages">
-          {PAGES.map(([id, label]) => <a key={id} href={`#/${id}`} aria-current={id === page ? "page" : undefined}>{label}</a>)}
-        </nav>
+      <div className="banner" role="note" data-testid="banner">
+        <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
+      </div>
+      <div className="claim-banner" role="note" data-testid="claim-banner">
+        <strong>Ping release claim (2026-11-02), UNVERIFIED on our tenant.</strong> Entitlement-aware discovery and the aggregate policy cap are simulated in this process. This app runs offline only: there is no live mode, and no live path until the release is on our tenant.
+      </div>
+      {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
+      <header className="top">
+        <h1>Hostile MCP</h1>
         <TopMenu
           mode={{ value: info?.source === "real" ? "real" : "mock", onChange: selectMode, realAvailable: info ? info.realAvailable === true : false, realHint: "Real is not available: this app has no live version (no outbound call of any kind, no tenant). Mock is the whole demo." }}
           theme={{ value: theme === "system" ? "auto" : theme, onChange: (t) => setThemeValue(t === "auto" ? "system" : t) }}
@@ -77,18 +77,15 @@ export default function App() {
           onReset={reset}
         >
           <ShelfLink />
-          <VerifyMark id="hostile-mcp" />
         </TopMenu>
+        <nav aria-label="Pages">
+          {PAGES.map(([id, label]) => <a key={id} href={`#/${id}`} aria-current={id === page ? "page" : undefined}>{label}</a>)}
+        </nav>
       </header>
       <main className="page" id="main" tabIndex={-1}>
-        <div className="banner" role="note" data-testid="banner">
-          <strong>This MCP server is deliberately hostile.</strong> Every payload is shown as inert text. The action tools are stubs, nothing is sent anywhere, and every off-box address is a reserved <code>.invalid</code> or example name.
-        </div>
-        <div className="claim-banner" role="note" data-testid="claim-banner">
-          <strong>Ping release claim (2026-11-02), UNVERIFIED on our tenant.</strong> Entitlement-aware discovery and the aggregate policy cap are simulated in this process. This app runs offline only: there is no live mode, and no live path until the release is on our tenant.
-        </div>
-        {mockOnly && <div className="banner mock-only" role="note" data-testid="mock-banner">Hosted, simulated: sample data only, nothing leaves this server</div>}
-        <Page present={present} theme={theme} source={info?.source === "real" ? "real" : "mock"} />
+
+        <PrivilegeCheck />
+        <Page present={present} theme={theme} />
         {notice && <p className="muted small" role="status" data-testid="notice">{notice}</p>}
         <p className="muted small" data-admin-only>The server serves payloads and never scores or blocks. Pinning notices change; it does not judge content.</p>
       </main>
