@@ -19,6 +19,19 @@ test("the hostile-server banner is on screen on every page", async () => {
   }
 });
 
+test("page order: the shell bar first, then main with the hostile-server banner as its first child, the claim banner right below", async () => {
+  render(<App />);
+  const bar = document.querySelector("header.shell-bar");
+  const main = document.querySelector("main#main");
+  expect(bar).not.toBeNull();
+  expect(bar.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(main.firstElementChild).toBe(screen.getByTestId("banner"));
+  expect(screen.getByTestId("banner").nextElementSibling).toBe(screen.getByTestId("claim-banner"));
+  expect(within(bar).getByRole("navigation", { name: "Pages" })).toHaveClass("shell-nav");
+  expect(within(bar).getByTestId("top-menu")).toHaveClass("shell-right");
+  expect(within(bar).getByTestId("mode-badge")).toHaveTextContent("Mock");
+});
+
 test("the release-claim banner is on every page, and stays in presenter mode", async () => {
   render(<App />);
   const claim = /Ping release claim \(2026-11-02\), UNVERIFIED on our tenant/;
@@ -39,7 +52,7 @@ test("a skip link is the first tab stop, then the nav in order, then the toolbar
   const user = userEvent.setup();
   const order = [];
   for (let i = 0; i < 10; i++) { await user.tab(); order.push(document.activeElement.textContent); }
-  expect(order).toEqual(["Skip to content", "MockReal", "Present", "Talk track", "Help", "Reset", "AutoLightDark", ...PAGES.map(([, l]) => l)].slice(0, 10));
+  expect(order).toEqual(["Skip to content", ...PAGES.map(([, l]) => l), "MockReal", "Present", "Talk track", "Help", "Reset", "AutoLightDark"].slice(0, 10));
   await user.click(screen.getByRole("link", { name: "Skip to content" }));
   expect(document.activeElement).toBe(document.getElementById("main"));
   expect(window.location.hash).toBe("");

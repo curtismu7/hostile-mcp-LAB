@@ -49,7 +49,7 @@ try {
   await page.keyboard.press('Enter');
   check(await page.evaluate(() => document.activeElement.id) === 'main', 'the skip link moves focus to the main region');
   await go('gallery');
-  // The shared TopMenu adds controls before the page nav; walk Tab until the first nav link (bounded).
+  // The page nav sits in the shell bar right after the skip link; walk Tab until the first nav link (bounded).
   let navReached = false;
   for (let i = 0; i < 20; i++) {
     await page.keyboard.press('Tab');

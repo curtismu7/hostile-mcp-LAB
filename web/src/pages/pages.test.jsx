@@ -92,11 +92,14 @@ test("rug-pull: three steps, in order, with the diff, both hashes and both clien
   const b = (name) => screen.getByRole("button", { name });
   expect(b("Fetch list #2")).toBeDisabled();
   expect(b("Compare the two clients")).toBeDisabled();
+  const primaries = () => [...document.querySelectorAll("button.primary")].map((e) => e.textContent);
+  expect(primaries()).toEqual(["Approve list #1 (pin it)"]); // one primary per view: the step you are on
   await userEvent.click(b("Approve list #1 (pin it)"));
   expect(await screen.findByTestId("step1")).toHaveTextContent("Get the latest price for a stock symbol.");
   expect(screen.getByTestId("step1")).toHaveTextContent(sha.before);
   expect(screen.getByTestId("step1").querySelector("mark")).toBeNull();
   expect(b("Approve list #1 (pin it)")).toBeDisabled();
+  expect(primaries()).toEqual(["Fetch list #2"]);
   await userEvent.click(b("Fetch list #2"));
   expect((await screen.findByTestId("step2")).querySelector("mark")).toHaveTextContent("<IMPORTANT>");
   await userEvent.click(b("Compare the two clients"));
