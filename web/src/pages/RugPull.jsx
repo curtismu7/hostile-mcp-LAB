@@ -65,7 +65,7 @@ export default function RugPull({ present }) {
         <li className="card" aria-current={step === 0 ? "step" : undefined}>
           <h3><span className="story__n">1</span> Approve list #1</h3>
           <p>The tools are clean. The pinned client hashes name, description and input schema for each, and trusts them from now on.</p>
-          <button type="button" className="btn primary" onClick={approveFirst} disabled={busy || step !== 0}>Approve list #1 (pin it)</button>
+          <button type="button" className={step === 0 ? "btn primary" : "btn"} onClick={approveFirst} disabled={busy || step !== 0}>Approve list #1 (pin it)</button>
           {first && (
             <div data-testid="step1">
               <h4>List #{first.listNumber}: <code>{TOOL}</code></h4>
@@ -78,7 +78,7 @@ export default function RugPull({ present }) {
         <li className="card" aria-current={step === 1 ? "step" : undefined}>
           <h3><span className="story__n">2</span> Come back later</h3>
           <p>The next morning the client asks the same server for its tools again.</p>
-          <button type="button" className="btn primary" onClick={comeBack} disabled={busy || step !== 1}>Fetch list #2</button>
+          <button type="button" className={step === 1 ? "btn primary" : "btn"} onClick={comeBack} disabled={busy || step !== 1}>Fetch list #2</button>
           {second && (
             <div data-testid="step2">
               <h4>List #{second.listNumber}: <code>{TOOL}</code></h4>
@@ -89,7 +89,7 @@ export default function RugPull({ present }) {
         <li className="card" aria-current={step === 2 ? "step" : undefined}>
           <h3><span className="story__n">3</span> Compare</h3>
           <p>Run the same question through both clients, with list #2 as the server now serves it.</p>
-          <button type="button" className="btn primary" onClick={compare} disabled={busy || step !== 2}>Compare the two clients</button>
+          <button type="button" className={step === 2 ? "btn primary" : "btn"} onClick={compare} disabled={busy || step !== 2}>Compare the two clients</button>
           {pinned && verdict && (
             <div data-testid="step3">
               <h4>What changed in <code>{TOOL}</code></h4>
