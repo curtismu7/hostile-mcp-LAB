@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
+import VerifyMark from "./components/VerifyMark.jsx";
 import Gallery from "./pages/Gallery.jsx";
 import Run from "./pages/Run.jsx";
 import RugPull from "./pages/RugPull.jsx";
@@ -76,6 +77,7 @@ export default function App() {
           onReset={reset}
         >
           <ShelfLink />
+          <VerifyMark id="hostile-mcp" />
         </TopMenu>
         <nav aria-label="Pages">
           {PAGES.map(([id, label]) => <a key={id} href={`#/${id}`} aria-current={id === page ? "page" : undefined}>{label}</a>)}
