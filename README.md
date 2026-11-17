@@ -244,15 +244,15 @@ MIT, from the source demo; see LICENSE. This is an independent community demo, n
 
 ## Real mode: through the PingOne Privilege gateway
 
-Real mode here is one live call through the SE PingOne Privilege gateway
-(`https://mcpgw.ai-demo.ping-devops.com`) with an agent access key from the shared settings
+Real mode here is one live call through the PingOne Privilege gateway (the origin in
+`HMG_GW_URL`) with an agent access key from the shared settings
 file (`~/Development/.env`, or the file `STANDALONE_ENV` names).
 
 **Privilege objects this lab uses:**
 
 | Object | Value |
 |---|---|
-| Gateway | `mcpgw.ai-demo.ping-devops.com` (cluster `ai-demo-cmuir`) |
+| Gateway | the origin in `HMG_GW_URL` (a PingOne Privilege gateway you can reach) |
 | Door (Agentic App) | `hostile-mcp / hostile-mcp-governed` — client path `/hostile-mcp / hostile-mcp-governed/mcp` |
 | Caller | agent access key `HMG_GW_KEY_LAB_AGENT` (write-only, never shown) |
 | Backend | `aggregate` = the gateway's MCP aggregate over `opensearch` (9 tools) + `banking-mcp` (33 tools); `aggregate-limited` = the same members with a tool filter |
