@@ -4,7 +4,7 @@
 :root[data-present="1"] [data-admin-only] { display: none; }
 /* Page frame (STANDALONE-UI-PATTERNS.md section 3): one centred 1100px column; the simulation banner is its first child.
    No side padding: the body already has the 16px gutter. */
-.page { max-width: 1100px; margin: 0 auto; padding: 0.25rem 0 2rem; }
+.page { max-width: 2200px; margin: 0 auto; padding: 0.25rem 0 2rem; }
 .page > .banner, .page > .claim-banner { margin-bottom: 1rem; } /* a visible gap between the banners and the content */
 h1 { margin: 0; font-size: 1.25rem; }
 h2 { margin: 0.5rem 0 0.25rem; font-size: 1.4rem; }
