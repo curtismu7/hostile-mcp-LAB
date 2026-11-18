@@ -58,6 +58,7 @@ export default function PrivilegeCheck({ apiBase = '', title = 'Privilege gatewa
       <header className="pcard__head">
         <h3 className="pcard__title">{title}</h3>
         {primaryRetry ? (
+          /* ui-pattern: allow P9 the gateway card's retry is card chrome; each page has its own Run primary */
           <button type="button" className="pcard__retry primary" onClick={refresh} aria-disabled={state.phase === 'checking' ? 'true' : undefined}>
             {state.phase === 'checking' ? 'Checking…' : 'Run the gateway check'}
           </button>

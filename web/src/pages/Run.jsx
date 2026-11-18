@@ -127,6 +127,7 @@ export default function Run({ present }) {
             {STAGES.map(([id, text]) => <option key={id} value={id}>{text}</option>)}
           </select>
         </label>
+        {/* ui-pattern: allow P9 Run both clients is the page's one primary action (the gateway card's retry is card chrome) */}
         <button type="submit" className="btn primary" disabled={busy}>{busy ? "Running..." : "Run both clients"}</button>
       </form>
       {error && <p role="alert" className="alert">Could not run: {error}</p>}
