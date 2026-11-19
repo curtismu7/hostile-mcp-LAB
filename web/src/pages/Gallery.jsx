@@ -51,16 +51,29 @@ export default function Gallery({ present }) {
       <p className="lede">Every poison the server can serve, grouped by where it hides. The badges say which control would catch it, taken from the catalog data. Nothing here is executed.</p>
       {error && <p role="alert" className="alert">Could not load the catalog: {error}</p>}
       {!catalog && !error && <p className="muted">Loading the catalog...</p>}
-      {catalog && CATEGORIES.map(([id, title], idx) => {
-        const items = catalog.items.filter((i) => i.category === id);
-        if (!items.length) return null;
-        return (
-          <section key={id} className="card" aria-labelledby={`cat-${id}`}>
-            <h3 id={`cat-${id}`}><span className="step-num" aria-hidden="true">{idx + 1}</span>{title}</h3>
-            <div className={items.length === 1 ? "grid grid--single" : "grid"}>{items.map((i) => <PoisonCard key={i.id} item={i} />)}</div>
-          </section>
-        );
-      })}
+      {catalog && (() => {
+        const secs = CATEGORIES.map(([id, title], idx) => {
+          const items = catalog.items.filter((i) => i.category === id);
+          if (!items.length) return null;
+          const section = (
+            <section key={id} className="card" aria-labelledby={`cat-${id}`}>
+              <h3 id={`cat-${id}`}><span className="step-num" aria-hidden="true">{idx + 1}</span>{title}</h3>
+              <div className={items.length === 1 ? "grid grid--single" : "grid"}>{items.map((i) => <PoisonCard key={i.id} item={i} />)}</div>
+            </section>
+          );
+          return { section, single: items.length === 1, n: idx };
+        }).filter(Boolean);
+        const out = [];
+        for (let i = 0; i < secs.length; i++) {
+          if (secs[i].single && secs[i + 1] && secs[i + 1].single) {
+            out.push(<div key={`pair-${secs[i].n}`} className="duo-secs">{[secs[i].section, secs[i + 1].section]}</div>);
+            i++;
+          } else {
+            out.push(secs[i].section);
+          }
+        }
+        return out;
+      })()}
     </>
   );
 }
