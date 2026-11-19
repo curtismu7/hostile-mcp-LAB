@@ -57,7 +57,7 @@ export default function Gallery({ present }) {
         return (
           <section key={id} className="card" aria-labelledby={`cat-${id}`}>
             <h3 id={`cat-${id}`}><span className="step-num" aria-hidden="true">{idx + 1}</span>{title}</h3>
-            <div className="grid">{items.map((i) => <PoisonCard key={i.id} item={i} />)}</div>
+            <div className={items.length === 1 ? "grid grid--single" : "grid"}>{items.map((i) => <PoisonCard key={i.id} item={i} />)}</div>
           </section>
         );
       })}
