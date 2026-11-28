@@ -9,6 +9,8 @@ import Diagram from "./pages/Diagram.jsx";
 import Gateway from "./pages/Gateway.jsx";
 import { getHealth, getInfo, resetSessions, setMode } from "./lib/api.js";
 import TopMenu from "./top-menu/TopMenu";
+import HelpDialog from "./help-dialog/HelpDialog.jsx";
+import { HELP_SECTIONS } from "./helpContent";
 import PrivilegeCheck from "./privilege-check/PrivilegeCheck.jsx";
 
 // Hash-routed pages (no router dependency). The banner is always on screen: this server is hostile on purpose.
@@ -33,6 +35,7 @@ export default function App() {
   const [mockOnly, setMockOnly] = useState(false);
   const [info, setInfo] = useState(null);
   const [present, setPresent] = useState(() => read("hostile.present", "0") === "1");
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => { getHealth().then((h) => setMockOnly(h?.mode === "mock-only")).catch(() => {}); }, []);
   useEffect(() => { getInfo().then(setInfo).catch(() => {}); }, []);
@@ -73,7 +76,7 @@ export default function App() {
           theme={{ value: theme === "system" ? "auto" : theme, onChange: (t) => setThemeValue(t === "auto" ? "system" : t) }}
           present={{ active: present, onToggle: togglePresent, label: "Present" }}
           talkTrack={{ active: present, onToggle: togglePresent }}
-          help={{ href: "https://github.com/curtismu7/hostile-mcp-LAB#readme" }}
+          help={{ onClick: () => setHelpOpen(true), title: "What this lab is, and what is simulated" }}
           version={info?.version || null}
           onReset={reset}
         >
@@ -95,6 +98,7 @@ export default function App() {
         {notice && <p className="muted small" role="status" data-testid="notice">{notice}</p>}
         <p className="muted small" data-admin-only>The server serves payloads and never scores or blocks. Pinning notices change; it does not judge content.</p>
       </main>
+      <HelpDialog isOpen={helpOpen} onClose={() => setHelpOpen(false)} sections={HELP_SECTIONS} docsUrl="https://github.com/curtismu7/hostile-mcp-LAB#readme" />
     </>
   );
 }
